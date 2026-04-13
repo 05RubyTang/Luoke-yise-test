@@ -47,7 +47,25 @@ export default function Report({ planId, spiritName, isPool, navigate }) {
     <div style={{ paddingBottom: 24 }}>
       {/* 庆祝头部 */}
       <div className="report-header">
-        <div style={{ fontSize: 52, lineHeight: 1, marginBottom: 10 }}>🎉</div>
+        {/* 精灵图 */}
+        <div style={{
+          width: 110, height: 110, borderRadius: 28,
+          background: '#F0E8D5',
+          border: '2.5px solid #C8A020',
+          boxShadow: '0 4px 0 #C8A020',
+          margin: '0 auto 12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', position: 'relative',
+        }}>
+          <SpiritAvatar name={spiritName} obtained size={96} showName={false} />
+          {/* 角标：异色光效 */}
+          <div style={{
+            position: 'absolute', top: -2, right: -2,
+            fontSize: 18, lineHeight: 1,
+            filter: 'drop-shadow(0 0 4px rgba(251,200,57,0.9))',
+          }}>✨</div>
+        </div>
+
         <div style={{ fontSize: 13, color: 'var(--text-light)', fontWeight: 600, letterSpacing: 1 }}>
           恭喜获得异色精灵
         </div>

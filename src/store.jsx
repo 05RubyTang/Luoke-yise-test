@@ -208,6 +208,25 @@ function reducer(state, action) {
         ),
       };
     }
+    case 'UPDATE_COMPLETED_STATS': {
+      // 编辑已完成任务的所有统计字段
+      return {
+        ...state,
+        completedTasks: state.completedTasks.map(t => {
+          if (t.id !== action.taskId) return t;
+          return {
+            ...t,
+            shieldBreakCount: action.shieldBreakCount ?? t.shieldBreakCount,
+            ballsUsed: action.ballsUsed,
+            breakdowns: {
+              ...t.breakdowns,
+              polluted: action.polluted ?? (t.breakdowns?.polluted || 0),
+              original: action.original ?? (t.breakdowns?.original || 0),
+            },
+          };
+        }),
+      };
+    }
     case 'UPDATE_FRUIT_PROGRESS': {
       return {
         ...state,

@@ -15,6 +15,12 @@ function formatDateTime(isoStr) {
   return `${yyyy}-${mm}-${dd} · ${hh}:${mi}`;
 }
 
+/** 解析 input 字符串为非负整数，无效则返回 null */
+function parseNonNeg(str) {
+  const n = parseInt(str.trim(), 10);
+  return (str.trim() !== '' && !isNaN(n) && n >= 0) ? n : null;
+}
+
 /** 单次刷取历史卡片 */
 function HistoryCard({ task, index }) {
   const { dispatch } = useStore();
@@ -26,24 +32,42 @@ function HistoryCard({ task, index }) {
   const original = breakdowns.original || 0;
   const shiny = breakdowns.shiny || 0;
 
-  const [editingBalls, setEditingBalls] = useState(false);
-  const [ballsInput, setBallsInput] = useState(task.ballsUsed != null ? String(task.ballsUsed) : '');
+  // ---- 编辑态 ----
+  const [editing, setEditing] = useState(false);
+  const [inputs, setInputs] = useState({
+    shieldBreakCount: '',
+    polluted: '',
+    original: '',
+    ballsUsed: '',
+  });
 
-  const handleSaveBalls = () => {
-    const val = ballsInput.trim();
-    const num = val ? parseInt(val, 10) : null;
-    dispatch({
-      type: 'UPDATE_COMPLETED_BALLS',
-      taskId: task.id,
-      ballsUsed: (num != null && !isNaN(num) && num >= 0) ? num : null,
+  const openEdit = () => {
+    setInputs({
+      shieldBreakCount: task.shieldBreakCount != null ? String(task.shieldBreakCount) : '',
+      polluted: String(polluted),
+      original: String(original),
+      ballsUsed: task.ballsUsed != null ? String(task.ballsUsed) : '',
     });
-    setEditingBalls(false);
+    setEditing(true);
   };
 
-  // 结果标签颜色
-  const resultStyle = isSuccess
-    ? { background: 'rgba(75,156,70,0.12)', color: '#4B9C46', border: '1px solid rgba(75,156,70,0.3)' }
-    : { background: 'rgba(103,93,83,0.08)', color: '#A09080', border: '1px solid rgba(103,93,83,0.15)' };
+  const handleSave = () => {
+    const sbc = parseNonNeg(inputs.shieldBreakCount);
+    const pol = parseNonNeg(inputs.polluted);
+    const ori = parseNonNeg(inputs.original);
+    const bal = parseNonNeg(inputs.ballsUsed);
+    dispatch({
+      type: 'UPDATE_COMPLETED_STATS',
+      taskId: task.id,
+      shieldBreakCount: sbc ?? task.shieldBreakCount,
+      polluted: pol ?? polluted,
+      original: ori ?? original,
+      ballsUsed: bal,
+    });
+    setEditing(false);
+  };
+
+  const setField = (field, val) => setInputs(prev => ({ ...prev, [field]: val }));
 
   return (
     <div className="card animate-in" style={{ animationDelay: `${index * 0.04}s` }}>
@@ -78,17 +102,19 @@ function HistoryCard({ task, index }) {
           </div>
         </div>
 
-        {/* 编辑球数按钮 */}
+        {/* 编辑按钮 */}
         <button
-          onClick={() => setEditingBalls(true)}
+          onClick={editing ? () => setEditing(false) : openEdit}
           style={{
-            flexShrink: 0, border: '1px solid rgba(103,93,83,0.25)',
-            background: 'var(--card-inner)', borderRadius: 6,
+            flexShrink: 0,
+            border: editing ? '1px solid rgba(103,93,83,0.3)' : '1px solid rgba(103,93,83,0.25)',
+            background: editing ? '#F0E8D5' : 'var(--card-inner)',
+            borderRadius: 6,
             padding: '4px 10px', fontSize: 10, fontWeight: 700,
-            color: 'var(--text-muted)', cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
+            color: editing ? 'var(--text-muted)' : 'var(--text-muted)',
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
           }}
-        >✎ 编辑</button>
+        >{editing ? '✕ 取消' : '✎ 编辑'}</button>
       </div>
 
       {/* 出货标签横幅（仅成功时） */}
@@ -119,10 +145,11 @@ function HistoryCard({ task, index }) {
           { label: '触发污染次数', value: task.shieldBreakCount, color: '#D4560A' },
           { label: '污染精灵', value: polluted, color: '#8B4BB8' },
           { label: '原色精灵', value: original, color: '#4B9C46' },
+          { label: '消耗球数', value: task.ballsUsed != null ? task.ballsUsed : '—', color: '#2B2A2E' },
         ].map((item, i) => (
           <div key={i} style={{
             padding: '10px 4px', textAlign: 'center',
-            borderRight: '1px solid rgba(103,93,83,0.12)',
+            borderRight: i < 3 ? '1px solid rgba(103,93,83,0.12)' : 'none',
           }}>
             <div style={{ fontSize: 17, fontWeight: 900, color: item.color, lineHeight: 1, fontFamily: 'var(--font-display)' }}>
               {item.value}
@@ -130,44 +157,51 @@ function HistoryCard({ task, index }) {
             <div style={{ fontSize: 9, color: '#A09080', marginTop: 4, fontWeight: 600 }}>{item.label}</div>
           </div>
         ))}
-        {/* 消耗球数格（可点击编辑） */}
-        <div
-          onClick={() => setEditingBalls(true)}
-          style={{
-            padding: '10px 4px', textAlign: 'center', cursor: 'pointer',
-          }}
-        >
-          <div style={{ fontSize: 17, fontWeight: 900, color: '#2B2A2E', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
-            {task.ballsUsed != null ? task.ballsUsed : '—'}
-          </div>
-          <div style={{ fontSize: 9, color: '#A09080', marginTop: 4, fontWeight: 600 }}>
-            消耗球数 <span style={{ color: 'rgba(103,93,83,0.5)' }}>✎</span>
-          </div>
-        </div>
       </div>
 
-      {/* 内联球数编辑区 */}
-      {editingBalls && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-          <input
-            type="number" inputMode="numeric"
-            value={ballsInput} onChange={e => setBallsInput(e.target.value)}
-            placeholder="输入消耗咕噜球数量" autoFocus
-            className="input-field" style={{ flex: 1 }}
-          />
-          <button onClick={handleSaveBalls} style={{
-            flexShrink: 0, padding: '10px 14px',
+      {/* ---- 编辑面板 ---- */}
+      {editing && (
+        <div style={{
+          background: '#F0E8D5', borderRadius: 10,
+          padding: '12px 12px 10px', marginBottom: 8,
+        }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: 0.5 }}>
+            修改数据
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px', marginBottom: 10 }}>
+            {[
+              { field: 'shieldBreakCount', label: '触发污染次数', placeholder: '次数', color: '#D4560A' },
+              { field: 'polluted',         label: '污染精灵',     placeholder: '只',  color: '#8B4BB8' },
+              { field: 'original',         label: '原色精灵',     placeholder: '只',  color: '#4B9C46' },
+              { field: 'ballsUsed',        label: '消耗球数',     placeholder: '个',  color: '#2B2A2E' },
+            ].map(({ field, label, placeholder, color }) => (
+              <div key={field}>
+                <div style={{ fontSize: 9, fontWeight: 700, color, marginBottom: 4 }}>{label}</div>
+                <input
+                  type="number" inputMode="numeric" min="0"
+                  value={inputs[field]}
+                  onChange={e => setField(field, e.target.value)}
+                  placeholder={placeholder}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '7px 10px', borderRadius: 7,
+                    border: `1.5px solid ${color}44`,
+                    background: '#FBF7EC',
+                    fontSize: 13, fontWeight: 800, fontFamily: 'var(--font-display)',
+                    color: color, outline: 'none',
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+          <button onClick={handleSave} style={{
+            width: '100%',
+            padding: '10px 0',
             border: '2px solid #2B2A2E', borderRadius: 'var(--radius-sm)',
             background: '#2B2A2E', color: '#FBF7EC',
             fontSize: 12, fontWeight: 800, fontFamily: 'var(--font-body)', cursor: 'pointer',
             boxShadow: '0 2px 0 #111014',
-          }}>保存</button>
-          <button onClick={() => setEditingBalls(false)} style={{
-            flexShrink: 0, padding: '10px 10px',
-            border: '1.5px solid rgba(103,93,83,0.3)', borderRadius: 'var(--radius-sm)',
-            background: '#FBF7EC', color: 'var(--text-light)',
-            fontSize: 12, fontFamily: 'var(--font-body)', cursor: 'pointer',
-          }}>取消</button>
+          }}>保存修改</button>
         </div>
       )}
 

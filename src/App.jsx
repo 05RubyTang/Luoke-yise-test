@@ -70,8 +70,19 @@ function AppInner() {
   );
 }
 
+const bgUrl = `url(${import.meta.env.BASE_URL}bg.png)`;
+
 export default function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 500);
+
+  useEffect(() => {
+    document.body.style.backgroundImage = bgUrl;
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
+    document.body.style.backgroundAttachment = 'fixed';
+    document.body.style.backgroundRepeat = 'no-repeat';
+    return () => { document.body.style.backgroundImage = ''; };
+  }, []);
 
   useEffect(() => {
     const handler = () => setIsMobile(window.innerWidth <= 500);
@@ -86,11 +97,15 @@ export default function App() {
   );
 
   if (isMobile) {
-    return <div className="mobile-wrapper">{inner}</div>;
+    return (
+      <div className="mobile-wrapper" style={{ backgroundImage: bgUrl }}>
+        {inner}
+      </div>
+    );
   }
 
   return (
-    <div className="mockup-wrapper">
+    <div className="mockup-wrapper" style={{ backgroundImage: bgUrl }}>
       <div className="mockup-phone">
         <div className="mockup-screen">{inner}</div>
       </div>

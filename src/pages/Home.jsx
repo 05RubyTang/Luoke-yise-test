@@ -104,7 +104,7 @@ export default function Home({ navigate }) {
         padding: '20px 16px 4px',
       }}>
         <img
-          src="/app-title.png"
+          src={`${import.meta.env.BASE_URL}app-title.png`}
           alt="小洛克的刷异色助手"
           style={{ height: 44, maxWidth: '85%', objectFit: 'contain' }}
         />
@@ -120,14 +120,15 @@ export default function Home({ navigate }) {
 
       {/* 新加入的伙伴（有数据才展示） */}
       {hasRecentShinies && (
-        <div className="card animate-in" style={{
+        <div className="animate-in" style={{
           margin: '0 16px 12px', padding: '14px 14px 12px',
-          background: 'transparent',
+          borderRadius: 'var(--radius)',
           border: 'none',
-          backgroundImage: 'url(/home-card-bg.png)',
+          backgroundImage: `url(${import.meta.env.BASE_URL}home-card-bg.png)`,
           backgroundSize: '115%',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
+          backgroundColor: 'transparent',
         }}>
           <div style={{
             fontSize: 20, fontWeight: 800, color: '#2B2A2E',

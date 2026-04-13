@@ -1,5 +1,6 @@
+const base = import.meta.env.BASE_URL;
 export default function SpiritAvatar({ name, obtained, size = 48, showName = true }) {
-  const src = `/spirits/${encodeURIComponent(name)}.png`;
+  const src = `${base}spirits/${encodeURIComponent(name)}.png`;
   return (
     <div
       className={`spirit-card${obtained ? ' spirit-card-obtained' : ''}`}

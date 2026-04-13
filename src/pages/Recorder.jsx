@@ -127,7 +127,7 @@ export default function Recorder({ planId, navigate }) {
         className="recorder-btn-break"
         onClick={() => setShowResult(true)}
       >
-        <img src="/break-shield.png" alt="触发污染" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+        <img src={`${import.meta.env.BASE_URL}break-shield.png`} alt="触发污染" style={{ width: 32, height: 32, objectFit: 'contain' }} />
         <span>记录一次触发污染</span>
       </button>
 

@@ -1,10 +1,12 @@
 // 9套果实方案常量数据
+const base = import.meta.env.BASE_URL;
+
 export const PLANS = [
   {
     id: 'fire',
     type: '火系',
     icon: '🔥',
-    iconImg: '/attrs/fire.png',
+    iconImg: `${base}attrs/fire.png`,
     color: '#E8733A',
     fruitA: '治愈兔果实',
     fruitB: '火红尾果实',
@@ -18,7 +20,7 @@ export const PLANS = [
     id: 'ice',
     type: '冰系',
     icon: '❄️',
-    iconImg: '/attrs/ice.png',
+    iconImg: `${base}attrs/ice.png`,
     color: '#42A5F5',
     fruitA: '呼呼猪果实',
     fruitB: '大耳帽兜果实',
@@ -32,7 +34,7 @@ export const PLANS = [
     id: 'electric',
     type: '电系',
     icon: '⚡',
-    iconImg: '/attrs/electric.png',
+    iconImg: `${base}attrs/electric.png`,
     color: '#FDD835',
     fruitA: '拉特果实',
     fruitB: '小星光果实',
@@ -46,7 +48,7 @@ export const PLANS = [
     id: 'phantom',
     type: '幻系',
     icon: '🔮',
-    iconImg: '/attrs/phantom.png',
+    iconImg: `${base}attrs/phantom.png`,
     color: '#AB47BC',
     fruitA: '仪使者果实',
     fruitB: '哭哭菇果实',
@@ -60,7 +62,7 @@ export const PLANS = [
     id: 'grass',
     type: '草系',
     icon: '🌿',
-    iconImg: '/attrs/grass.png',
+    iconImg: `${base}attrs/grass.png`,
     color: '#66BB6A',
     fruitA: '格兰种子果实',
     fruitB: '奇丽草果实',
@@ -74,7 +76,7 @@ export const PLANS = [
     id: 'evil',
     type: '恶系',
     icon: '😈',
-    iconImg: '/attrs/evil.png',
+    iconImg: `${base}attrs/evil.png`,
     color: '#5D4037',
     fruitA: '小夜果实',
     fruitB: '恶魔狼果实',
@@ -88,7 +90,7 @@ export const PLANS = [
     id: 'ghost',
     type: '幽系',
     icon: '👻',
-    iconImg: '/attrs/ghost.png',
+    iconImg: `${base}attrs/ghost.png`,
     color: '#7E57C2',
     fruitA: '小灵面果实',
     fruitB: '墨鱿士果实',
@@ -102,7 +104,7 @@ export const PLANS = [
     id: 'mech',
     type: '机械系',
     icon: '⚙️',
-    iconImg: '/attrs/mech.png',
+    iconImg: `${base}attrs/mech.png`,
     color: '#78909C',
     fruitA: '机械方方果实',
     fruitB: null,
@@ -116,7 +118,7 @@ export const PLANS = [
     id: 'light',
     type: '光系',
     icon: '✨',
-    iconImg: '/attrs/light.png',
+    iconImg: `${base}attrs/light.png`,
     color: '#FFB300',
     fruitA: '独角兽果实',
     fruitB: '犀角鸟果实',
@@ -131,7 +133,7 @@ export const PLANS = [
 // 所有可产出的异色精灵（去重）
 export const ALL_SHINIES = [...new Set(PLANS.flatMap(p => p.shinies))];
 
-// 根据精灵名查找它所在的方案
+// 根据精灵名查找所有包含该精灵的方案
 export function findPlansForSpirit(name) {
   return PLANS.filter(p => p.shinies.includes(name));
 }

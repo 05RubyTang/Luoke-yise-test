@@ -1,8 +1,9 @@
+const base = import.meta.env.BASE_URL;
 const TABS = [
-  { id: 'home',       img: '/tab-home.png',       label: '首页' },
-  { id: 'plans',      img: '/tab-plans.png',      label: '方案' },
-  { id: 'collection', img: '/tab-collection.png', label: '图鉴' },
-  { id: 'history',    img: '/tab-history.png',    label: '记录' },
+  { id: 'home',       img: `${base}tab-home.png`,       label: '首页' },
+  { id: 'plans',      img: `${base}tab-plans.png`,      label: '方案' },
+  { id: 'collection', img: `${base}tab-collection.png`, label: '图鉴' },
+  { id: 'history',    img: `${base}tab-history.png`,    label: '记录' },
 ];
 
 export default function TabBar({ current, onChange }) {

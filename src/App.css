@@ -152,42 +152,14 @@ body {
 .page-container::-webkit-scrollbar { display: none; }
 
 /* ====================================================
-   通用卡片（三层叠纸效果）
+   通用卡片
    ==================================================== */
 .card {
   background: #FBF7EC;
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);
   padding: 16px;
-  margin: 0 16px 22px 16px;   /* 底部多留点，给伪元素留空间 */
-  box-shadow: var(--shadow-card);
-  position: relative;
-  z-index: 1;
-}
-
-/* 第二层：稍深浅棕，向右微倾 */
-.card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #EFE5CC;
-  border: 1.5px solid var(--card-border);
-  border-radius: var(--radius);
-  transform: rotate(1.4deg) translateY(3px);
-  z-index: -1;
-  box-shadow: var(--shadow-card);
-}
-
-/* 第三层：更深浅棕，向左微倾 */
-.card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #E5D9BF;
-  border: 1.5px solid var(--card-border);
-  border-radius: var(--radius);
-  transform: rotate(-1.1deg) translateY(5px);
-  z-index: -2;
+  margin: 0 16px 16px 16px;
   box-shadow: var(--shadow-card);
 }
 
@@ -752,14 +724,6 @@ body {
   background: #FFF9E0;
   border-color: #C8A020;
 }
-.recorder-plan-card::before {
-  background: #F5EAAA;
-  border-color: #C8A020;
-}
-.recorder-plan-card::after {
-  background: #EDDF90;
-  border-color: #C8A020;
-}
 
 .recorder-btn-break {
   display: flex;
@@ -865,16 +829,6 @@ body {
 
 .active-task-card {
   background: #FFF9E0;
-  border-color: #C8A020;
-  box-shadow: 0 2px 0 #C8A020;
-}
-.active-task-card::before {
-  background: #F5EAAA;
-  border-color: #C8A020;
-  box-shadow: 0 2px 0 #C8A020;
-}
-.active-task-card::after {
-  background: #EDDF90;
   border-color: #C8A020;
   box-shadow: 0 2px 0 #C8A020;
 }

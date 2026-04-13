@@ -47,7 +47,7 @@ export default function Report({ planId, spiritName, isPool, navigate }) {
     <div style={{ paddingBottom: 24 }}>
       {/* 庆祝头部 */}
       <div className="report-header">
-        {/* 精灵图 */}
+        {/* 精灵大图 */}
         <div style={{
           width: 110, height: 110, borderRadius: 28,
           background: '#F0E8D5',
@@ -57,7 +57,12 @@ export default function Report({ planId, spiritName, isPool, navigate }) {
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           overflow: 'hidden', position: 'relative',
         }}>
-          <SpiritAvatar name={spiritName} obtained size={96} showName={false} />
+          <img
+            src={`${import.meta.env.BASE_URL}spirits/${encodeURIComponent(spiritName)}.png`}
+            alt={spiritName}
+            style={{ width: 96, height: 96, objectFit: 'contain' }}
+            onError={e => { e.target.style.display = 'none'; }}
+          />
           {/* 角标：异色光效 */}
           <div style={{
             position: 'absolute', top: -2, right: -2,

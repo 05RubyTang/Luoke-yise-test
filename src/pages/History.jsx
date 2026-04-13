@@ -40,8 +40,11 @@ function HistoryCard({ task, index }) {
     original: '',
     ballsUsed: '',
   });
+  // ---- 删除确认态 ----
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const openEdit = () => {
+    setConfirmDelete(false);
     setInputs({
       shieldBreakCount: task.shieldBreakCount != null ? String(task.shieldBreakCount) : '',
       polluted: String(polluted),
@@ -67,12 +70,16 @@ function HistoryCard({ task, index }) {
     setEditing(false);
   };
 
+  const handleDelete = () => {
+    dispatch({ type: 'DELETE_COMPLETED_TASK', taskId: task.id });
+  };
+
   const setField = (field, val) => setInputs(prev => ({ ...prev, [field]: val }));
 
   return (
     <div className="card animate-in" style={{ animationDelay: `${index * 0.04}s` }}>
       {/* 顶部行：精灵头像 + 名称 + 时间 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         {/* 精灵图 or 方案属性图标 */}
         <div style={{
           width: 48, height: 48, borderRadius: 12,
@@ -102,7 +109,7 @@ function HistoryCard({ task, index }) {
           </div>
         </div>
 
-        {/* 编辑按钮 */}
+        {/* 编辑 & 删除按钮组 */}
         <button
           onClick={editing ? () => setEditing(false) : openEdit}
           style={{
@@ -111,11 +118,48 @@ function HistoryCard({ task, index }) {
             background: editing ? '#F0E8D5' : 'var(--card-inner)',
             borderRadius: 6,
             padding: '4px 10px', fontSize: 10, fontWeight: 700,
-            color: editing ? 'var(--text-muted)' : 'var(--text-muted)',
+            color: 'var(--text-muted)',
             cursor: 'pointer', fontFamily: 'var(--font-body)',
           }}
         >{editing ? '✕ 取消' : '✎ 编辑'}</button>
+        <button
+          onClick={() => { setEditing(false); setConfirmDelete(v => !v); }}
+          style={{
+            flexShrink: 0,
+            border: confirmDelete ? '1px solid rgba(200,53,26,0.5)' : '1px solid rgba(200,53,26,0.25)',
+            background: confirmDelete ? '#FFF2EF' : 'var(--card-inner)',
+            borderRadius: 6,
+            padding: '4px 10px', fontSize: 10, fontWeight: 700,
+            color: '#C8351A',
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}
+        >🗑</button>
       </div>
+
+      {/* ---- 删除确认条 ---- */}
+      {confirmDelete && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: '#FFF2EF', borderRadius: 8, padding: '8px 12px', marginBottom: 10,
+          border: '1px solid rgba(200,53,26,0.2)',
+        }}>
+          <span style={{ fontSize: 11, color: '#C8351A', fontWeight: 700 }}>
+            确定删除这条记录？{isSuccess && task.resultSpirit ? `（若无其他「${task.resultSpirit}」记录，将恢复为未解锁）` : ''}
+          </span>
+          <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+            <button onClick={handleDelete} style={{
+              padding: '4px 12px', borderRadius: 6,
+              border: '1.5px solid #C8351A', background: '#C8351A', color: '#fff',
+              fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: 'var(--font-body)',
+            }}>删除</button>
+            <button onClick={() => setConfirmDelete(false)} style={{
+              padding: '4px 10px', borderRadius: 6,
+              border: '1px solid rgba(103,93,83,0.25)', background: 'var(--card-inner)', color: 'var(--text-muted)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-body)',
+            }}>取消</button>
+          </div>
+        </div>
+      )}
 
       {/* 出货标签横幅（仅成功时） */}
       {isSuccess && (

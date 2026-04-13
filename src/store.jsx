@@ -227,6 +227,35 @@ function reducer(state, action) {
         }),
       };
     }
+    case 'DELETE_COMPLETED_TASK': {
+      const taskToDelete = state.completedTasks.find(t => t.id === action.taskId);
+      if (!taskToDelete) return state;
+      const newCompleted = state.completedTasks.filter(t => t.id !== action.taskId);
+      // 如果该精灵是成功出货的，检查剩余记录里是否还有该精灵的出货
+      let newSpirits = state.spirits;
+      const spiritName = taskToDelete.resultSpirit;
+      if (spiritName && taskToDelete.resultType !== 'abandoned') {
+        const stillHasRecord = newCompleted.some(
+          t => t.resultSpirit === spiritName && t.resultType !== 'abandoned'
+        );
+        if (!stillHasRecord && state.spirits[spiritName]?.obtained) {
+          newSpirits = {
+            ...state.spirits,
+            [spiritName]: {
+              ...state.spirits[spiritName],
+              obtained: false,
+              obtainedAt: null,
+              obtainedFrom: null,
+            },
+          };
+        }
+      }
+      return {
+        ...state,
+        spirits: newSpirits,
+        completedTasks: newCompleted,
+      };
+    }
     case 'UPDATE_FRUIT_PROGRESS': {
       return {
         ...state,

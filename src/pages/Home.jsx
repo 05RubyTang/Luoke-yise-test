@@ -123,12 +123,13 @@ export default function Home({ navigate }) {
         <div className="animate-in" style={{
           margin: '0 16px 12px', padding: '14px 14px 12px',
           borderRadius: 'var(--radius)',
-          border: 'none',
+          border: '1.5px solid var(--card-border)',
+          boxShadow: 'var(--shadow-card)',
+          backgroundColor: '#FBF7EC',
           backgroundImage: `url(${import.meta.env.BASE_URL}home-card-bg.png)`,
           backgroundSize: '115%',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          backgroundColor: 'transparent',
         }}>
           <div style={{
             fontSize: 20, fontWeight: 800, color: '#2B2A2E',

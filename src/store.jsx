@@ -582,12 +582,31 @@ export function StoreProvider({ children }) {
     async function init() {
       setSyncStatus('syncing');
       try {
-        // 1. 获取已有 session，没有则静默匿名登录
+        // 1. 获取已有 session
         let { data: { session } } = await supabase.auth.getSession();
+
         if (!session) {
-          const { data, error } = await supabase.auth.signInAnonymously();
-          if (error) throw error;
-          session = data.session;
+          // ── magic link 竞态保护 ─────────────────────────────────────────
+          // implicit 流的 access_token 在 URL hash 里，Supabase SDK 需要一点时间
+          // 解析并存入 localStorage。若此时 getSession() 返回 null 就直接调用
+          // signInAnonymously()，会覆盖 magic link 的 session，导致绑定失败。
+          // 检测到 hash 中有 access_token 时，轮询等待（最多 3 秒）再决定是否匿名登录。
+          const hashHasToken = window.location.hash.includes('access_token');
+          if (hashHasToken) {
+            for (let i = 0; i < 6 && !session; i++) {
+              await new Promise(r => setTimeout(r, 500));
+              if (cancelled) return;
+              const { data: { session: s } } = await supabase.auth.getSession();
+              if (s) session = s;
+            }
+          }
+
+          // 等待后仍无 session（或没有 magic link）→ 正常匿名登录
+          if (!session) {
+            const { data, error } = await supabase.auth.signInAnonymously();
+            if (error) throw error;
+            session = data.session;
+          }
         }
         if (cancelled) return;
 

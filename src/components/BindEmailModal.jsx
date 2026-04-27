@@ -2,16 +2,18 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase, APP_BASE_URL } from '../supabase';
 import { useStore } from '../store';
 
-// 流程说明：
-//   bind  → 有匿名 session：updateUser 升级（uid 不变，数据全部保留）
-//           若该邮箱已注册过：自动切换成 otp_recover，发魔法链接找回
-//   login → 换设备找回：signInWithOtp 发魔法链接
-//   otp_recover → 同 login，但是从 bind 错误自动跳过来，UI 显示不同文案
+// 流程说明（implicit 流，邮件链接携带 access_token，任何浏览器打开均可）：
+//   bind / login / otp_recover → 统一使用 signInWithOtp 发魔法链接
+//   implicit 流下无需 code_verifier，跨浏览器（微信→Safari/邮箱App）完全兼容
+//   store 的 hydrateFromCloud 通过 pending_bind_email 反查旧数据并合并
 
 async function sendOtp(email) {
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { emailRedirectTo: APP_BASE_URL },
+    options: {
+      emailRedirectTo: APP_BASE_URL,
+      // shouldCreateUser: true 为默认值，首次绑定自动创建 email 用户
+    },
   });
   if (error) throw error;
 }
@@ -63,42 +65,11 @@ export default function BindEmailModal({ onClose, onSuccess }) {
       // pending_bind_email 让 hydrateFromCloud 可以按邮箱反查旧 uid 的数据
       await forceSyncNow(trimmed);
 
-      if (mode === 'bind') {
-        // ⚠️ 微信环境下 updateUser 的确认链接在 Safari 打开时会产生新 uid，数据丢失
-        // 统一改用 signInWithOtp：两个浏览器通过同一邮箱共享数据，
-        // store 的 hydrateFromCloud 会用 pending_bind_email 反查旧 uid 并合并
-        if (inWechat) {
-          await sendOtp(trimmed);
-        } else {
-          const { data: { session } } = await supabase.auth.getSession();
-
-          if (session && !session.user.email) {
-            // 同浏览器匿名 session → 用 updateUser 升级（uid 不变，最干净）
-            const { error: err } = await supabase.auth.updateUser(
-              { email: trimmed },
-              { emailRedirectTo: APP_BASE_URL }
-            );
-            if (err) {
-              const msg = err.message || '';
-              if (msg.toLowerCase().includes('already registered') ||
-                  msg.toLowerCase().includes('already been registered')) {
-                // 邮箱已存在 → 自动切换：直接发 OTP 让用户登录找回账号
-                await sendOtp(trimmed);
-                setMode('otp_recover');
-                setStep('sent');
-                return;
-              }
-              throw err;
-            }
-          } else {
-            // 无 session 或已绑定 → 降级发 OTP
-            await sendOtp(trimmed);
-          }
-        }
-      } else {
-        // login / otp_recover 模式：直接发 OTP
-        await sendOtp(trimmed);
-      }
+      // 所有模式统一使用 signInWithOtp（implicit 流）
+      // 原因：updateUser 在跨浏览器场景（邮箱App、Safari）打开确认链接时会产生新 uid，
+      //       导致旧数据找不到。signInWithOtp + implicit 流直接在链接里携带 token，
+      //       任何浏览器打开均可，store 的 hydrateFromCloud 会通过 pending_bind_email 恢复旧数据
+      await sendOtp(trimmed);
 
       setStep('sent');
       setResendCd(RESEND_CD); // 进入已发送后启动冷却

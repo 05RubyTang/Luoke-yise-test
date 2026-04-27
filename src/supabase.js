@@ -12,8 +12,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     // 自动从 URL hash / query 中提取 token（邮件链接跳回时必须）
     detectSessionInUrl: true,
-    // 使用 PKCE 流（更安全，且兼容 SPA 刷新后 session 不丢失）
-    flowType: 'pkce',
+    // 改用 implicit 流：邮件链接直接携带 access_token（hash 片段）
+    // PKCE 流的 code_verifier 存在发起浏览器的 localStorage，跨浏览器打开链接时找不到 verifier 导致失败
+    // implicit 流无需 verifier，任何浏览器打开链接都能直接换取 session
+    flowType: 'implicit',
     // 持久化 session 到 localStorage
     persistSession: true,
     // 自动刷新过期 token

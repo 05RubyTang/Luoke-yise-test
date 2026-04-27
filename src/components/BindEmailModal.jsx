@@ -60,24 +60,32 @@ export default function BindEmailModal({ onClose, onSuccess }) {
     setError('');
 
     try {
-      // 发邮件前静默强制同步到云端，并把目标邮箱写入 pending_bind_email
-      // 微信用户点击邮件链接会跳到 Safari，Safari localStorage 是空的
-      // pending_bind_email 让 hydrateFromCloud 可以按邮箱反查旧 uid 的数据
+      // ① 发邮件前强制同步：直接从 Supabase 获取 session，不依赖 React state
+      //   同时把目标邮箱写入 user_email 列，供跨浏览器兜底反查
+      //   失败时抛出错误，阻止发邮件（避免无备份就发出链接）
       await forceSyncNow(trimmed);
+    } catch (syncErr) {
+      const msg = syncErr.message || '';
+      if (msg.includes('尚未获得用户身份')) {
+        setError('账号初始化中，请稍候 3 秒后重试');
+      } else {
+        setError(`数据备份失败，暂不发送邮件。原因：${msg}`);
+      }
+      setLoading(false);
+      return; // 备份失败则不发邮件，保护数据安全
+    }
 
-      // 所有模式统一使用 signInWithOtp（implicit 流）
-      // 原因：updateUser 在跨浏览器场景（邮箱App、Safari）打开确认链接时会产生新 uid，
-      //       导致旧数据找不到。signInWithOtp + implicit 流直接在链接里携带 token，
-      //       任何浏览器打开均可，store 的 hydrateFromCloud 会通过 pending_bind_email 恢复旧数据
+    try {
+      // ② 所有场景统一使用 signInWithOtp（implicit 流）
+      //   implicit 流的链接直接携带 access_token，任何浏览器打开均可换取 session
+      //   store 的 hydrateFromCloud 会按 user_email 反查旧数据并合并
       await sendOtp(trimmed);
 
       setStep('sent');
-      setResendCd(RESEND_CD); // 进入已发送后启动冷却
+      setResendCd(RESEND_CD);
     } catch (err) {
       const msg = err.message || '';
-      if (msg.includes('Auth session missing')) {
-        setError('初始化中，请稍候 3 秒再试');
-      } else if (msg.toLowerCase().includes('rate limit') || msg.includes('too many')) {
+      if (msg.toLowerCase().includes('rate limit') || msg.includes('too many')) {
         setError('发送太频繁，请稍后再试');
       } else {
         setError(msg || '发送失败，请检查网络后重试');

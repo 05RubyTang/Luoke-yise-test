@@ -470,8 +470,7 @@ function mergeStates(local, cloud) {
 async function hydrateFromCloud(uid, dispatch, localFallback) {
   const { data: row, error } = await supabase
     .from('user_data')
-    // 同时拉 avatar / user_name / pending_bind_email，换设备时可还原
-    .select('data, avatar, user_name, pending_bind_email')
+    .select('data, avatar, user_name')
     .eq('user_id', uid)
     .maybeSingle();
 
@@ -480,46 +479,37 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
   const localData = localFallback || getLocalState();
 
   // 还原云端的 avatar / user_name 到 localStorage（换设备恢复用）
-  if (row?.avatar) {
-    localStorage.setItem('lk_user_avatar', row.avatar);
-  }
+  if (row?.avatar) localStorage.setItem('lk_user_avatar', row.avatar);
   if (row?.user_name && !localStorage.getItem('lk_username')) {
     localStorage.setItem('lk_username', row.user_name);
   }
 
   let cloudData = row?.data;
 
-  // ── 跨浏览器绑定兜底：新 uid 查不到数据时，尝试用 pending_bind_email 反查旧数据 ──
-  // 场景：微信里匿名用户（uid=A）发送绑定邮件，Safari 打开链接后 uid 变成 B
-  //       数据存在 A 下面，用邮箱列 pending_bind_email 反查 A 的数据并合并
+  // ── 跨浏览器绑定兜底 ────────────────────────────────────────────────────
+  // 场景：微信匿名用户（uid=A）发绑定邮件，邮箱 App / Safari 打开链接 → uid=B
+  //   forceSyncNow(email) 提前把 user_email=email 写进 uid=A 那行
+  //   这里用 session 的 email 反查 user_email 列，找到 uid=A 的数据并合并
   if (!cloudData || (!cloudData.spirits && !cloudData.completedTasks)) {
     try {
-      // 尝试通过 user_email 反查（旧 uid 行里已写好邮箱）
-      const { data: rows } = await supabase
-        .from('user_data')
-        .select('user_id, data, avatar, user_name')
-        .eq('pending_bind_email', uid) // 这里先用邮箱列查，下面再用 eq user_email
-        .maybeSingle();
-      // 备选：用 user_email 反查
-      if (!rows?.data) {
-        // 获取当前 session 的 email
-        const { data: { session } } = await supabase.auth.getSession();
-        const email = session?.user?.email;
-        if (email) {
-          const { data: emailRow } = await supabase
-            .from('user_data')
-            .select('user_id, data, avatar, user_name')
-            .eq('pending_bind_email', email)
-            .maybeSingle();
-          if (emailRow?.data) {
-            cloudData = emailRow.data;
-            // 还原 avatar / user_name
-            if (emailRow.avatar) localStorage.setItem('lk_user_avatar', emailRow.avatar);
-            if (emailRow.user_name && !localStorage.getItem('lk_username')) {
-              localStorage.setItem('lk_username', emailRow.user_name);
-            }
-            console.log('[Supabase] 跨浏览器绑定兜底：从旧 uid 恢复数据成功');
+      const { data: { session } } = await supabase.auth.getSession();
+      const email = session?.user?.email;
+      if (email) {
+        const { data: emailRow } = await supabase
+          .from('user_data')
+          .select('data, avatar, user_name')
+          .eq('user_email', email)      // 用已有的 user_email 列反查
+          .neq('user_id', uid)          // 排除自身
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (emailRow?.data) {
+          cloudData = emailRow.data;
+          if (emailRow.avatar) localStorage.setItem('lk_user_avatar', emailRow.avatar);
+          if (emailRow.user_name && !localStorage.getItem('lk_username')) {
+            localStorage.setItem('lk_username', emailRow.user_name);
           }
+          console.log('[Supabase] 跨浏览器绑定兜底：从旧 uid 恢复数据成功');
         }
       }
     } catch (e) {
@@ -537,13 +527,12 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
 
     const merged = mergeStates(localData, cloudData);
     dispatch({ type: '_HYDRATE_FROM_CLOUD', data: merged });
-    // 把合并结果上传到新的 uid 下，并清除 pending_bind_email
+    // 把合并结果写到新 uid 下
     try {
       const meta = buildUserMeta(merged);
       await supabase.from('user_data').upsert({
         user_id: uid,
         data: merged,
-        pending_bind_email: null,
         updated_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         last_active_at: new Date().toISOString(),
@@ -554,12 +543,11 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
     }
     return 'merged';
   } else {
-    // 云端无有效数据（新账号/首次绑定）→ 直接上传本地数据
+    // 云端无有效数据 → 上传本地数据
     const meta = buildUserMeta(localData);
     await supabase.from('user_data').upsert({
       user_id: uid,
       data: localData,
-      pending_bind_email: null,
       updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       last_active_at: new Date().toISOString(),
@@ -774,31 +762,38 @@ export function StoreProvider({ children }) {
   }, [state, initialized, userId, syncStatus]);
 
   // ── 强制立即同步（绑定邮箱前调用，确保云端有数据）─────────────────────────
-  // email: 用户即将绑定/登录的邮箱，写入 pending_bind_email 供跨浏览器兜底查询
-  // 返回 Promise<'ok' | 'offline' | 'no_user'>
+  // email: 用户即将绑定/登录的邮箱，同时写入 user_email + pending_bind_email
+  //        供跨浏览器兜底查询（新 uid 登录后按邮箱反查旧数据）
+  // 返回 Promise<'ok'>，失败时直接 throw（调用方自行处理）
   const forceSyncNow = async (email) => {
-    if (!userId) return 'no_user';
-    if (syncStatus === 'offline') return 'offline';
+    // 直接从 Supabase 拿最新 session，不依赖 React state（init 可能尚未完成）
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user?.id || userId;
+    if (!uid) throw new Error('尚未获得用户身份，请稍候几秒后重试');
+
+    // 直接从 localStorage 读最新持久化数据，确保拿到的是最新状态
+    let currentState = state;
     try {
-      const meta = buildUserMeta(state);
-      const { error } = await supabase
-        .from('user_data')
-        .upsert({
-          user_id: userId,
-          data: state,
-          updated_at: new Date().toISOString(),
-          last_active_at: new Date().toISOString(),
-          ...(authUser?.email ? { user_email: authUser.email } : {}),
-          // 把目标邮箱写入 pending_bind_email 列，供 Safari 打开链接后反查旧数据
-          ...(email ? { pending_bind_email: email } : {}),
-          ...meta,
-        }, { onConflict: 'user_id' });
-      if (error) throw error;
-      return 'ok';
-    } catch (err) {
-      console.warn('[Supabase] forceSyncNow 失败:', err.message);
-      return 'offline';
-    }
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) currentState = JSON.parse(raw);
+    } catch { /* 解析失败保留 React state */ }
+
+    const meta = buildUserMeta(currentState);
+    const { error } = await supabase
+      .from('user_data')
+      .upsert({
+        user_id: uid,
+        data: currentState,
+        updated_at: new Date().toISOString(),
+        last_active_at: new Date().toISOString(),
+        // 写入目标邮箱：user_email 和 pending_bind_email 双保险
+        // 新 uid 登录后，hydrateFromCloud 按 user_email 反查此行并合并数据
+        ...(email ? { user_email: email, pending_bind_email: email } : {}),
+        ...meta,
+      }, { onConflict: 'user_id' });
+
+    if (error) throw new Error(`数据备份失败：${error.message}`);
+    return 'ok';
   };
 
   return (

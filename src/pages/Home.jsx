@@ -98,34 +98,41 @@ export default function Home({ navigate }) {
 
   return (
     <div style={{ paddingBottom: 16 }}>
-      {/* 顶部标题图 */}
-      <div style={{
-        display: 'flex', justifyContent: 'center', alignItems: 'center',
-        padding: '20px 16px 4px',
-      }}>
+      {/* 顶部 hero 区域：标题 + 小洛克装饰 */}
+      <div style={{ position: 'relative', padding: '36px 16px 0', minHeight: 90 }}>
+        {/* logo 靠左，右边留出 110px 给小洛克 */}
         <img
           src={`${import.meta.env.BASE_URL}app-title.png`}
           alt="小洛克的刷异色助手"
-          style={{ height: 44, maxWidth: '85%', objectFit: 'contain' }}
+          style={{ height: 42, maxWidth: 'calc(100% - 110px)', objectFit: 'contain', objectPosition: 'left', display: 'block' }}
         />
-      </div>
-
-      {/* 副标题 */}
-      <div style={{
-        textAlign: 'center', padding: '4px 0 12px',
-        fontSize: 12, color: 'var(--text-light)', letterSpacing: 2, fontWeight: 600,
-      }}>
-        选方案 · 记触发污染 · 集异色
+        {/* 副标题 */}
+        <div style={{
+          padding: '6px 0 14px',
+          fontSize: 12, color: 'var(--text-light)', letterSpacing: 2, fontWeight: 600,
+        }}>
+          用耐心换来独一无二的伙伴
+        </div>
+        {/* 小洛克：绝对定位右上角，完整显示在屏幕内 */}
+        <img
+          src={`${import.meta.env.BASE_URL}xiaoluoke.png`}
+          alt="小洛克"
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 28,
+            width: 110,
+            objectFit: 'contain',
+            pointerEvents: 'none',
+            zIndex: 2,
+          }}
+        />
       </div>
 
       {/* 新加入的伙伴（有数据才展示） */}
       {hasRecentShinies && (
         <div className="animate-in" style={{
           margin: '0 16px 12px', padding: '14px 14px 12px',
-          borderRadius: 'var(--radius)',
-          border: '1.5px solid var(--card-border)',
-          boxShadow: 'var(--shadow-card)',
-          backgroundColor: '#FBF7EC',
           backgroundImage: `url(${import.meta.env.BASE_URL}home-card-bg.png)`,
           backgroundSize: '115%',
           backgroundPosition: 'center',
@@ -134,9 +141,21 @@ export default function Home({ navigate }) {
           <div style={{
             fontSize: 20, fontWeight: 800, color: '#2B2A2E',
             marginBottom: 12, letterSpacing: 0.5,
-            display: 'flex', alignItems: 'center', gap: 5,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}>
-            <span style={{ fontSize: 18 }}>🌟</span> 最新加入的伙伴
+            <img
+              src={`${import.meta.env.BASE_URL}dimo-bg.png`}
+              alt=""
+              aria-hidden="true"
+              style={{
+                width: 28, height: 28, objectFit: 'contain',
+                filter: 'brightness(0)',
+                opacity: 0.85,
+                flexShrink: 0,
+                alignSelf: 'center',
+              }}
+            />
+            最新加入的伙伴
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {recentShinies.map(t => (
@@ -208,8 +227,8 @@ export default function Home({ navigate }) {
 
       {/* 开始新刷取 */}
       <button
-        className="btn btn-primary animate-in"
-        onClick={() => navigate('plans')}
+        className="btn btn-gold animate-in"
+        onClick={() => navigate('planPicker')}
       >
         {tasks.length > 0 ? '+ 开始新的刷取' : '✨ 开始刷取异色精灵'}
       </button>

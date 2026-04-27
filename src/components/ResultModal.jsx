@@ -3,7 +3,34 @@ export default function ResultModal({ onResult, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
-        <div className="modal-title">这次触发污染结果？</div>
+
+        {/* 顶部标题行：左上角取消 + 标题 */}
+        <div style={{
+          display: 'flex', alignItems: 'center',
+          marginBottom: 16, gap: 8,
+        }}>
+          <button
+            onClick={onClose}
+            style={{
+              flexShrink: 0,
+              background: 'var(--card-inner)',
+              border: '1.5px solid var(--divider)',
+              borderRadius: 8,
+              padding: '4px 10px',
+              fontSize: 12, fontWeight: 700,
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            取消
+          </button>
+          <div className="modal-title" style={{ margin: 0, flex: 1, textAlign: 'center' }}>
+            这次触发污染结果？
+          </div>
+          {/* 右侧占位，让标题居中 */}
+          <div style={{ flexShrink: 0, width: 44 }} />
+        </div>
 
         <button className="modal-option" onClick={() => onResult('original')}>
           <span className="modal-option-icon">🟢</span>
@@ -40,8 +67,6 @@ export default function ResultModal({ onResult, onClose }) {
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>逃跑/战败，本次不计入</div>
           </div>
         </button>
-
-        <button className="modal-close" onClick={onClose}>取消</button>
       </div>
     </div>
   );

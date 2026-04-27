@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { PLANS } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
+import { FruitLine } from '../components/FruitTag';
 import ProgressBar from '../components/ProgressBar';
 import ShieldDots from '../components/ShieldDots';
 import ResultModal from '../components/ResultModal';
@@ -11,7 +12,14 @@ import ShinySelectModal from '../components/ShinySelectModal';
 export default function Recorder({ planId, navigate }) {
   const { state, dispatch } = useStore();
   const task = (state.activeTasks || []).find(t => t.planId === planId);
-  const plan = PLANS.find(p => p.id === planId);
+  const rawPlan = PLANS.find(p => p.id === planId)
+    || (state.userPlanConfig || []).find(p => p.id === planId);
+  // 标准化：确保 shinies 是数组、type/label 有值
+  const plan = rawPlan ? {
+    ...rawPlan,
+    type:   rawPlan.type   || rawPlan.label || '自定义方案',
+    shinies: Array.isArray(rawPlan.shinies) ? rawPlan.shinies : [],
+  } : null;
 
   const [showResult, setShowResult] = useState(false);
   const [showShinySelect, setShowShinySelect] = useState(false);
@@ -66,7 +74,9 @@ export default function Recorder({ planId, navigate }) {
           }}>
             <PlanIcon plan={plan} size={26} />
           </div>
-          <span className="page-header-title">{plan.type}方案</span>
+          <span className="page-header-title">
+            {plan.season ? `${plan.type}刷取方案` : `${plan.type}方案`}
+          </span>
         </div>
         <button
           onClick={handleAbandon}
@@ -83,20 +93,62 @@ export default function Recorder({ planId, navigate }) {
       </div>
 
       {/* 方案提示卡 */}
-      <div className="card recorder-plan-card">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <PlanIcon plan={plan} size={22} />
-          <span style={{ fontSize: 12, fontWeight: 800, color: '#C8830A', letterSpacing: 0.5 }}>
-            3+3 刷取方案
-          </span>
+      <div className="card recorder-plan-card" style={{ padding: 0, overflow: 'hidden' }}>
+        {/* 深色标题条 */}
+        <div style={{
+          background: '#2B2A2E',
+          padding: '12px 14px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 11,
+              background: 'rgba(255,255,255,0.13)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0, padding: 4,
+            }}>
+              <PlanIcon plan={plan} size={26} />
+            </div>
+            <div>
+              <div style={{
+                fontSize: 17, fontWeight: 900, color: '#fff',
+                fontFamily: 'var(--font-display)', letterSpacing: 0.5, lineHeight: 1.2,
+              }}>
+                {plan.season ? `${plan.type}刷取方案` : '3+3 刷取方案'}
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2, fontWeight: 600 }}>
+                {plan.shinies.length} 套方案
+              </div>
+            </div>
+          </div>
+          {/* 右：已获得/总数 */}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 1, flexShrink: 0 }}>
+            <span style={{ fontSize: 20, fontWeight: 900, color: '#fff', fontFamily: 'var(--font-display)' }}>
+              {plan.shinies.filter(n => state.spirits[n]?.obtained).length}
+            </span>
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+              /{plan.shinies.length}
+            </span>
+          </div>
         </div>
+        {/* 正常内容区 */}
+        <div style={{ padding: '12px 14px 14px' }}>
         <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 3 }}>
-          果实：{plan.fruitA}{plan.fruitB ? ` + ${plan.fruitB}` : '（单放）'}
+          <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
         </div>
-        <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 10 }}>
-          抓3只{plan.spiritA}
-          {plan.spiritB ? ` → 抓3只${plan.spiritB} → 循环` : ' → 每3只一轮'}
-        </div>
+        {plan.season ? (
+          plan.sanctuary && (
+            <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 10 }}>
+              <span style={{ color: '#5B9CF6', fontWeight: 700 }}>📍</span>
+              {' '}「{plan.sanctuary}」
+            </div>
+          )
+        ) : (
+          <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 10 }}>
+            抓3只{plan.spiritA}
+            {plan.spiritB ? ` → 抓3只${plan.spiritB} → 循环` : ' → 每3只一轮'}
+          </div>
+        )}
         {/* 异色精灵解锁进度 */}
         <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700, letterSpacing: 0.5, marginBottom: 6 }}>
           异色精灵解锁进度
@@ -120,6 +172,24 @@ export default function Recorder({ planId, navigate }) {
             );
           })}
         </div>
+        </div>
+      </div>
+
+      {/* 果冻/星尘虫提示条 */}
+      <div style={{
+        margin: '0 16px 4px',
+        padding: '8px 12px',
+        borderRadius: 10,
+        background: '#FFF9E0',
+        border: '1.5px solid #C8A020',
+        display: 'flex', alignItems: 'flex-start', gap: 8,
+        fontSize: 12, color: 'var(--text-light)', lineHeight: 1.7,
+      }}>
+        <span style={{ fontSize: 14, flexShrink: 0, lineHeight: 1.6 }}>⚠️</span>
+        <span>
+          刷出<span style={{ fontWeight: 800, color: '#C8830A' }}>果冻 / 星尘虫</span>污染时，
+          <span style={{ fontWeight: 800 }}>不计入保底</span>，无需点击「记录破盾」。
+        </span>
       </div>
 
       {/* ★ 记录触发污染大按钮 ★ */}

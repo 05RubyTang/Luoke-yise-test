@@ -9,9 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist -r https://github.com/05RubyTang/yise-Luoke-v2.0-ruby-s.git"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.104.1",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },

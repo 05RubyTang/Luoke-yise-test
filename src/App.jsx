@@ -1,16 +1,64 @@
 import { useState, useEffect, useCallback } from 'react';
-import { StoreProvider } from './store';
+import { StoreProvider, useStore } from './store';
 import TabBar from './components/TabBar';
 import Home from './pages/Home';
 import PlanList from './pages/PlanList';
+import PlanEditor from './pages/PlanEditor';
+import AttrPlanDetail from './pages/AttrPlanDetail';
 import Checklist from './pages/Checklist';
 import Recorder from './pages/Recorder';
 import Report from './pages/Report';
 import Collection from './pages/Collection';
-import History from './pages/History';
+import Profile from './pages/Profile';
+import ManualShinyPage from './pages/ManualShinyPage';
+import FruitGuide from './pages/FruitGuide';
+import CustomChecklist from './pages/CustomChecklist';
+import SilhouettePattern from './components/SilhouettePattern';
 import './App.css';
 
-const TAB_PAGES = ['home', 'plans', 'collection', 'history'];
+// 动态注入自定义字体（使用 BASE_URL 保证 GitHub Pages 路径正确）
+const _base = import.meta.env.BASE_URL;
+const _fontStyle = document.createElement('style');
+_fontStyle.textContent = `
+  @font-face {
+    font-family: 'AaFengKuangYuanShiRen';
+    src: url('${_base}fonts/AaFengKuangYuanShiRen.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+  }
+`;
+document.head.appendChild(_fontStyle);
+
+const TAB_PAGES = ['home', 'plans', 'collection', 'profile'];
+
+// ─── 绑定成功全局 Toast ───────────────────────────────────────────────────────
+function AuthToast() {
+  const { authToast, clearAuthToast } = useStore();
+
+  useEffect(() => {
+    if (!authToast) return;
+    const timer = setTimeout(clearAuthToast, 6000); // 6 秒后自动消失
+    return () => clearTimeout(timer);
+  }, [authToast, clearAuthToast]);
+
+  if (!authToast) return null;
+
+  const isBind = authToast.type === 'bind';
+
+  return (
+    <div className="auth-toast" onClick={clearAuthToast}>
+      <div className="auth-toast-icon">{isBind ? '🎉' : '✅'}</div>
+      <div className="auth-toast-body">
+        <div className="auth-toast-title">
+          {isBind ? '邮箱绑定成功！' : '登录成功，数据已恢复！'}
+        </div>
+        <div className="auth-toast-email">{authToast.email}</div>
+      </div>
+      <button className="auth-toast-close">✕</button>
+    </div>
+  );
+}
 
 function AppInner() {
   const [pageStack, setPageStack] = useState([{ name: 'home', params: {} }]);
@@ -35,24 +83,43 @@ function AppInner() {
       case 'home':
         return <Home navigate={navigate} />;
       case 'plans':
-        return <PlanList navigate={navigate} />;
+        return <PlanList navigate={navigate} mode="library" />;
+      case 'attrPlanDetail':
+        return (
+          <AttrPlanDetail
+            planId={current.params.planId}
+            navigate={navigate}
+            goBack={goBack}
+          />
+        );
+      case 'planPicker':
+        return <PlanList navigate={navigate} mode="picker" goBack={goBack} />;
+      case 'planEditor':
+        return (
+          <PlanEditor
+            basePlanId={current.params.basePlanId}
+            userPlanId={current.params.userPlanId}
+            goBack={goBack}
+          />
+        );
       case 'checklist':
         return <Checklist planId={current.params.planId} navigate={navigate} goBack={goBack} />;
       case 'recorder':
-        return <Recorder planId={current.params.planId} navigate={navigate} />;
+      // report 时背景依然渲染 Recorder
       case 'report':
-        return (
-          <Report
-            planId={current.params.planId}
-            spiritName={current.params.spiritName}
-            isPool={current.params.isPool}
-            navigate={navigate}
-          />
-        );
+        return <Recorder planId={current.params.planId} navigate={navigate} />;
       case 'collection':
         return <Collection />;
       case 'history':
-        return <History />;
+        return <Profile navigate={navigate} />;
+      case 'profile':
+        return <Profile navigate={navigate} />;
+      case 'manualShiny':
+        return <ManualShinyPage goBack={goBack} />;
+      case 'fruitGuide':
+        return <FruitGuide goBack={goBack} />;
+      case 'customChecklist':
+        return <CustomChecklist navigate={navigate} goBack={goBack} />;
       default:
         return <Home navigate={navigate} />;
     }
@@ -60,9 +127,21 @@ function AppInner() {
 
   return (
     <div className="app-content">
-      <div className="page-container">
+      {/* 剪影纹样背景层，position:absolute 被 app-content overflow:hidden 裁剪 */}
+      <SilhouettePattern />
+      <AuthToast />
+      <div className="page-container" style={{ position: 'relative', zIndex: 1 }}>
         {renderPage()}
       </div>
+      {/* Report 弹窗：直接挂在 app-content 上，position:absolute 覆盖全屏，Recorder 在背景可见 */}
+      {current.name === 'report' && (
+        <Report
+          planId={current.params.planId}
+          spiritName={current.params.spiritName}
+          isPool={current.params.isPool}
+          navigate={navigate}
+        />
+      )}
       {showTabBar && (
         <TabBar current={current.name} onChange={(tab) => navigate(tab)} />
       )}

@@ -191,11 +191,11 @@ export const FRUIT_GUIDE_GROUPS = [
     entries: [
       {
         fruit: '雪娃娃果实',
-        spirit: '雪影娃娃',
+        spirit: '雪娃娃',
         attrs: ['冰系'],
-        unlock: '集齐 60 只精灵图鉴（全区域）',
-        location: '雪山左侧山腰蓝色树枝树（2棵）',
-        tip: '绕过雪影首领后，身后还有 1 棵',
+        unlock: '抓/进化 20 只雪灵',
+        location: null,
+        tip: null,
       },
     ],
   },

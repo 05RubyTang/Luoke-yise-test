@@ -216,6 +216,7 @@ export default function FruitGuide({ goBack }) {
           </div>
         </div>
       ))}
+
     </div>
   );
 }

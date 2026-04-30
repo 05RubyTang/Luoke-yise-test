@@ -8,8 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist -r https://github.com/05RubyTang/yise-Luoke-v2.0-ruby-s.git"
+    "deploy:test": "VITE_BASE_PATH=/Luoke-yise-test/ npm run build && gh-pages -d dist -r https://github.com/05RubyTang/Luoke-yise-test.git",
+    "deploy:prod": "VITE_BASE_PATH=/yise-Luoke-v2.0-ruby-s/ npm run build && gh-pages -d dist -r https://github.com/05RubyTang/yise-Luoke-v2.0-ruby-s.git",
+    "deploy:main": "VITE_BASE_PATH=/LuoKe-Shuayise/ npm run build && gh-pages -d dist -r https://github.com/05RubyTang/LuoKe-Shuayise.git"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.104.1",

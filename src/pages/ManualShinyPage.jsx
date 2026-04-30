@@ -145,7 +145,12 @@ export default function ManualShinyPage({ goBack }) {
   const [shieldBreakCount, setShieldBreakCount] = useState('');
   const [polluted, setPolluted] = useState('');
   const [original, setOriginal] = useState('');
+  // 球数模式：'simple'（总数）| 'byType'（分球类）
+  const [ballMode, setBallMode] = useState('simple');
   const [ballsUsed, setBallsUsed] = useState('');
+  const [ballAdv, setBallAdv] = useState('');
+  const [ballSea, setBallSea] = useState('');
+  const [ballAtt, setBallAtt] = useState('');
   const [dateInput, setDateInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -160,7 +165,21 @@ export default function ManualShinyPage({ goBack }) {
     const sbc = parseN(shieldBreakCount);
     const pol = parseN(polluted);
     const ori = parseN(original);
-    const bal = parseN(ballsUsed);
+    let bal = null;
+    let byType = null;
+    if (ballMode === 'byType') {
+      const adv = parseN(ballAdv) ?? 0;
+      const sea = parseN(ballSea) ?? 0;
+      const att = parseN(ballAtt) ?? 0;
+      byType = { adv, sea, att };
+      bal = adv + sea + att;
+      if (bal === 0 && ballAdv === '' && ballSea === '' && ballAtt === '') {
+        bal = null;
+        byType = null;
+      }
+    } else {
+      bal = parseN(ballsUsed);
+    }
     let completedAt = new Date().toISOString();
     if (dateInput.trim()) {
       const d = new Date(dateInput.trim());
@@ -174,6 +193,7 @@ export default function ManualShinyPage({ goBack }) {
       shieldBreakCount: sbc,
       breakdowns: { polluted: pol ?? 0, original: ori ?? 0, shiny: 0 },
       ballsUsed: bal,
+      ...(byType ? { ballsUsedByType: byType } : {}),
       completedAt,
     });
     setSaved(true);
@@ -333,8 +353,59 @@ export default function ManualShinyPage({ goBack }) {
               padding: '14px', marginBottom: 12,
             }}>
               <div style={{ marginBottom: 14 }}>
-                <SectionLabel>消耗球数 <span style={{ fontWeight: 500 }}>（选填）</span></SectionLabel>
-                <NumInput value={ballsUsed} onChange={setBallsUsed} placeholder="消耗了多少精灵球？" color="#2B2A2E" />
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <SectionLabel style={{ marginBottom: 0 }}>消耗球数 <span style={{ fontWeight: 500 }}>（选填）</span></SectionLabel>
+                  {/* 模式切换胶囊 */}
+                  <div style={{
+                    display: 'flex', borderRadius: 20,
+                    border: '1.5px solid var(--divider)', overflow: 'hidden',
+                    flexShrink: 0,
+                  }}>
+                    {[{ key: 'simple', label: '总球数' }, { key: 'byType', label: '分球类' }].map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setBallMode(key)}
+                        style={{
+                          padding: '4px 11px', border: 'none', cursor: 'pointer',
+                          fontSize: 11, fontWeight: 700,
+                          background: ballMode === key ? '#2B2A2E' : 'transparent',
+                          color: ballMode === key ? '#FBC839' : 'var(--text-muted)',
+                          transition: 'all 0.15s',
+                        }}
+                      >{label}</button>
+                    ))}
+                  </div>
+                </div>
+
+                {ballMode === 'simple' ? (
+                  <NumInput value={ballsUsed} onChange={setBallsUsed} placeholder="消耗了多少精灵球？" color="#2B2A2E" />
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#1565C0', marginBottom: 5 }}>高级球</div>
+                      <NumInput value={ballAdv} onChange={setBallAdv} placeholder="消耗高级球数量" color="#1565C0" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#6A1B9A', marginBottom: 5 }}>赛季球</div>
+                      <NumInput value={ballSea} onChange={setBallSea} placeholder="消耗赛季球数量" color="#6A1B9A" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#D4560A', marginBottom: 5 }}>属性球</div>
+                      <NumInput value={ballAtt} onChange={setBallAtt} placeholder="消耗属性球数量" color="#D4560A" />
+                    </div>
+                    {/* 合计预览 */}
+                    {(ballAdv || ballSea || ballAtt) && (
+                      <div style={{
+                        padding: '7px 12px', borderRadius: 8,
+                        background: 'rgba(43,42,46,0.07)',
+                        fontSize: 12, fontWeight: 700, color: 'var(--text)',
+                        textAlign: 'right',
+                      }}>
+                        合计：{(parseN(ballAdv) ?? 0) + (parseN(ballSea) ?? 0) + (parseN(ballAtt) ?? 0)} 球
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
               <div>
                 <SectionLabel>获得时间 <span style={{ fontWeight: 500 }}>（选填，留空 = 现在）</span></SectionLabel>

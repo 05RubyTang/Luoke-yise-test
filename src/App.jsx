@@ -12,6 +12,7 @@ import Collection from './pages/Collection';
 import Profile from './pages/Profile';
 import ManualShinyPage from './pages/ManualShinyPage';
 import FruitGuide from './pages/FruitGuide';
+import SpecialForms from './pages/SpecialForms';
 import CustomChecklist from './pages/CustomChecklist';
 import SilhouettePattern from './components/SilhouettePattern';
 import './App.css';
@@ -103,7 +104,14 @@ function AppInner() {
           />
         );
       case 'checklist':
-        return <Checklist planId={current.params.planId} navigate={navigate} goBack={goBack} />;
+        return (
+          <Checklist
+            planId={current.params.planId}
+            basePlanId={current.params.basePlanId ?? current.params.planId}
+            navigate={navigate}
+            goBack={goBack}
+          />
+        );
       case 'recorder':
       // report 时背景依然渲染 Recorder
       case 'report':
@@ -118,6 +126,8 @@ function AppInner() {
         return <ManualShinyPage goBack={goBack} />;
       case 'fruitGuide':
         return <FruitGuide goBack={goBack} />;
+      case 'specialForms':
+        return <SpecialForms goBack={goBack} />;
       case 'customChecklist':
         return <CustomChecklist navigate={navigate} goBack={goBack} />;
       default:
@@ -138,12 +148,41 @@ function AppInner() {
         <Report
           planId={current.params.planId}
           spiritName={current.params.spiritName}
-          isPool={current.params.isPool}
+          resultType={current.params.resultType}
           navigate={navigate}
         />
       )}
       {showTabBar && (
-        <TabBar current={current.name} onChange={(tab) => navigate(tab)} />
+        <>
+          <div style={{
+            textAlign: 'center',
+            fontSize: '10px',
+            color: 'rgba(120,100,80,0.6)',
+            padding: '2px 8px',
+            lineHeight: 1.4,
+            background: 'transparent',
+          }}>
+            精灵图片来源：
+            <a
+              href="https://wiki.biligame.com/rocom"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'rgba(100,80,160,0.7)', textDecoration: 'none' }}
+            >
+              洛克王国手游BWIKI
+            </a>
+            ，遵循{' '}
+            <a
+              href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'rgba(100,80,160,0.7)', textDecoration: 'none' }}
+            >
+              CC BY-NC-SA 4.0
+            </a>
+          </div>
+          <TabBar current={current.name} onChange={(tab) => navigate(tab)} />
+        </>
       )}
     </div>
   );

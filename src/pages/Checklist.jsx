@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS } from '../data/plans';
+import { PLANS, SPECIAL_FORMS } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import FruitTag, { FruitLine } from '../components/FruitTag';
@@ -13,21 +13,120 @@ const TIPS = [
   '刷取期间不要跨区传送或退出游戏',
 ];
 
-export default function Checklist({ planId, navigate, goBack }) {
+export default function Checklist({ planId, basePlanId, navigate, goBack }) {
   const { state, dispatch } = useStore();
-  const plan = PLANS.find(p => p.id === planId)
-    || (state.userPlanConfig || []).find(p => p.id === planId);
-  const [ballInput, setBallInput] = useState('');
+
+  // 当前选中方案（可通过「换方案」切换）
+  const [activePlanId, setActivePlanId] = useState(planId);
+  const [showSwitcher, setShowSwitcher] = useState(false);
+
+  // 反查已有 task 的球数数据，用于预填输入框（防止回到此页时空提交覆盖旧数据）
+  const _existingTask = (state.activeTasks || []).find(t => t.planId === planId);
+  const _existMode = _existingTask?.ballMode || 'simple';
+  const _existBst  = _existingTask?.ballStartByType;
+
+  // 咕噜球模式：'simple'（总数）| 'byType'（分类），初始值从已有 task 继承
+  const [ballMode, setBallMode] = useState(_existMode);
+  // simple 模式输入框：已有 task 的 ballStart 预填
+  const [ballInput, setBallInput] = useState(
+    _existingTask?.ballStart != null ? String(_existingTask.ballStart) : ''
+  );
+  // byType 模式下三类球：已有 task 的 ballStartByType 预填
+  const [ballAdv, setBallAdv] = useState(_existBst?.adv != null ? String(_existBst.adv) : '');
+  const [ballSea, setBallSea] = useState(_existBst?.sea != null ? String(_existBst.sea) : '');
+  const [ballAtt, setBallAtt] = useState(_existBst?.att != null ? String(_existBst.att) : '');
+
+  const rawPlan = PLANS.find(p => p.id === activePlanId)
+    || (state.userPlanConfig || []).find(p => p.id === activePlanId);
+  // 标准化：自定义方案继承基础属性方案的图标
+  const attrBase = rawPlan?.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
+
+  // 自定义方案：通过 fruitA/fruitB 在 PLANS 里反查对应的解锁条件
+  // 仅当自定义方案自身没有 unlockA/B 时才做反查
+  const isUserPlan = !!(rawPlan?.attrId); // 有 attrId 说明是自定义方案
+  const fruitUnlockMap = (() => {
+    if (!isUserPlan || !rawPlan) return {};
+    const result = {};
+    if (rawPlan.fruitA) {
+      const src = PLANS.find(p => p.fruitA === rawPlan.fruitA || p.fruitB === rawPlan.fruitA);
+      if (src) {
+        const unlock = src.fruitA === rawPlan.fruitA ? src.unlockA : src.unlockB;
+        result.fruitA = unlock || '';
+      }
+    }
+    if (rawPlan.fruitB) {
+      const src = PLANS.find(p => p.fruitA === rawPlan.fruitB || p.fruitB === rawPlan.fruitB);
+      if (src) {
+        const unlock = src.fruitA === rawPlan.fruitB ? src.unlockA : src.unlockB;
+        result.fruitB = unlock || '';
+      }
+    }
+    return result;
+  })();
+
+  const plan = rawPlan ? {
+    ...rawPlan,
+    type:    rawPlan.type    || rawPlan.label || '自定义方案',
+    shinies: Array.isArray(rawPlan.shinies) ? rawPlan.shinies : [],
+    unlockA: rawPlan.unlockA || fruitUnlockMap.fruitA || '',
+    unlockB: rawPlan.unlockB || fruitUnlockMap.fruitB || '',
+    // 自定义方案无 iconImg/icon 时从基础方案继承
+    iconImg: rawPlan.iconImg || attrBase?.iconImg || null,
+    icon:    rawPlan.icon    || attrBase?.icon    || '✨',
+  } : null;
+
+  // 判断某个解锁条件是否为「图鉴类解锁」（需要集齐图鉴）
+  const isPokedexUnlock = (unlockStr) => unlockStr && unlockStr.includes('集齐');
+
+  // 当前方案关联的特殊形态（通过 planIds 匹配）
+  const relatedForms = plan ? SPECIAL_FORMS.filter(f => f.planIds.includes(plan.id)) : [];
+
+  // 同属性的所有可选方案（基础 + 自定义），用于「换方案」
+  const baseAttrId = basePlanId ?? planId;
+  const basePlan = PLANS.find(p => p.id === baseAttrId);
+  const switcherOptions = basePlan ? [
+    // 基础推荐方案
+    { id: basePlan.id, label: `${basePlan.type}（推荐）`, fruitA: basePlan.fruitA, fruitB: basePlan.fruitB, isDefault: true },
+    // 同属性的用户自定义方案
+    ...(state.userPlanConfig || [])
+      .filter(p => p.attrId === baseAttrId)
+      .map(p => ({ id: p.id, label: p.label || '自定义方案', fruitA: p.fruitA, fruitB: p.fruitB, isDefault: false })),
+  ] : null;
 
   if (!plan) return null;
 
   const handleStart = () => {
-    const ballStart = ballInput.trim() ? parseInt(ballInput.trim(), 10) : null;
-    dispatch({
-      type: 'START_TASK',
-      planId: plan.id,
-      ballStart: (ballStart && !isNaN(ballStart)) ? ballStart : null,
-    });
+    // 判断该方案是否已有进行中的 task
+    const existingTask = (state.activeTasks || []).find(t => t.planId === plan.id);
+    const taskExists = !!existingTask;
+
+    if (ballMode === 'byType') {
+      const adv = parseInt(ballAdv.trim(), 10) || 0;
+      const sea = parseInt(ballSea.trim(), 10) || 0;
+      const att = parseInt(ballAtt.trim(), 10) || 0;
+      const hasAny = ballAdv.trim() || ballSea.trim() || ballAtt.trim();
+      const ballPayload = {
+        ballMode: 'byType',
+        ballStartByType: hasAny ? { adv, sea, att } : null,
+      };
+      dispatch(taskExists
+        ? { type: 'SET_TASK_BALLS', planId: plan.id, ...ballPayload }
+        : { type: 'START_TASK',    planId: plan.id, ...ballPayload }
+      );
+    } else {
+      const parsed = ballInput.trim() ? parseInt(ballInput.trim(), 10) : null;
+      const validParsed = (parsed != null && !isNaN(parsed) && parsed >= 0) ? parsed : null;
+      // 若用户没有修改输入框（空），保留 task 中已有的 ballStart，不覆盖为 null
+      const finalBallStart = validParsed ?? (taskExists ? (existingTask.ballStart ?? null) : null);
+      const ballPayload = {
+        ballMode: 'simple',
+        ballStart: finalBallStart,
+      };
+      dispatch(taskExists
+        ? { type: 'SET_TASK_BALLS', planId: plan.id, ...ballPayload }
+        : { type: 'START_TASK',    planId: plan.id, ...ballPayload }
+      );
+    }
     navigate('recorder', { planId: plan.id });
   };
 
@@ -44,7 +143,82 @@ export default function Checklist({ planId, navigate, goBack }) {
       <div className="page-header">
         <button className="back-btn" onClick={goBack}>←</button>
         <span className="page-header-title">确认方案</span>
+        {/* 「换方案」按钮：仅当有多个可选方案时才显示 */}
+        {switcherOptions && switcherOptions.length > 1 && (
+          <button
+            onClick={() => setShowSwitcher(v => !v)}
+            style={{
+              marginLeft: 'auto',
+              padding: '5px 12px',
+              borderRadius: 8,
+              border: showSwitcher ? '1.5px solid #2B2A2E' : '1.5px solid rgba(103,93,83,0.3)',
+              background: showSwitcher ? '#2B2A2E' : 'var(--card-inner)',
+              color: showSwitcher ? '#FBF7EC' : 'var(--text-muted)',
+              fontSize: 12, fontWeight: 700,
+              fontFamily: 'var(--font-body)', cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {showSwitcher ? '收起 ↑' : '更换为自定义方案 ↓'}
+          </button>
+        )}
       </div>
+
+      {/* 方案切换面板（展开时显示） */}
+      {showSwitcher && switcherOptions && (
+        <div className="card animate-in" style={{ padding: '10px 0', marginBottom: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: 0.5, padding: '0 14px 8px' }}>
+            选择方案
+          </div>
+          {switcherOptions.map(opt => {
+            const isSelected = opt.id === activePlanId;
+            return (
+              <button
+                key={opt.id}
+                onClick={() => { setActivePlanId(opt.id); setShowSwitcher(false); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '10px 14px',
+                  border: 'none', borderBottom: '1px solid var(--divider)',
+                  background: isSelected ? 'rgba(200,131,10,0.07)' : 'transparent',
+                  cursor: 'pointer', textAlign: 'left',
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                  background: isSelected ? '#C8830A' : 'var(--divider)',
+                  border: isSelected ? '2px solid #C8830A' : '2px solid var(--card-border)',
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: isSelected ? 800 : 600,
+                    color: isSelected ? '#C8830A' : 'var(--text)',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    {opt.label}
+                    {!opt.isDefault && (
+                      <span style={{
+                        fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10,
+                        background: 'rgba(103,93,83,0.1)', color: 'var(--text-muted)',
+                        border: '1px solid rgba(103,93,83,0.18)',
+                      }}>自定义</span>
+                    )}
+                  </div>
+                  {(opt.fruitA || opt.fruitB) && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {opt.fruitA}{opt.fruitB ? ` + ${opt.fruitB}` : ''}
+                    </div>
+                  )}
+                </div>
+                {isSelected && (
+                  <span style={{ fontSize: 14, color: '#C8830A', flexShrink: 0 }}>✓</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── 方案概览卡 ── */}
       <div className="card animate-in">
@@ -176,8 +350,8 @@ export default function Checklist({ planId, navigate, goBack }) {
           </div>
         )}
 
-        {/* 属性方案：可产出精灵列表 */}
-        {!plan.season && (
+        {/* 属性方案：可产出精灵列表（自定义方案无 shinies 则不渲染） */}
+        {!plan.season && plan.shinies.length > 0 && (
           <>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 700, letterSpacing: 0.5 }}>
               可产出异色精灵
@@ -199,29 +373,84 @@ export default function Checklist({ planId, navigate, goBack }) {
             {[
               { label: plan.fruitA, desc: plan.unlockA },
               plan.fruitB ? { label: plan.fruitB, desc: plan.unlockB } : null,
-            ].filter(Boolean).map((item, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 10px', borderRadius: 8,
-                background: 'var(--card-inner)',
-              }}>
-                <FruitTag name={item.label} size={40} showName={false} />
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2 }}>
-                    {item.label}
+            ].filter(Boolean).map((item, i) => {
+              const isPokedex = isPokedexUnlock(item.desc);
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '8px 10px', borderRadius: 8,
+                  background: isPokedex ? 'rgba(91,156,246,0.06)' : 'var(--card-inner)',
+                  border: isPokedex ? '1px solid rgba(91,156,246,0.25)' : '1px solid transparent',
+                }}>
+                  <FruitTag name={item.label} size={40} showName={false} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2 }}>
+                      {item.label}
+                    </div>
+                    {item.desc ? (
+                      <>
+                        {isPokedex && (
+                          <div style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 8,
+                            background: 'rgba(91,156,246,0.12)', color: '#5B9CF6',
+                            border: '1px solid rgba(91,156,246,0.3)',
+                            marginBottom: 4,
+                          }}>
+                            📖 图鉴解锁
+                          </div>
+                        )}
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                          {item.desc}
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'rgba(103,93,83,0.4)', lineHeight: 1.5, fontStyle: 'italic' }}>
+                        暂无解锁信息
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>{item.desc}</div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
-      {/* 精灵球库存 */}
+      {/* 特殊形态庇护所提示（有关联特殊形态时展示） */}
+      {!plan.season && relatedForms.length > 0 && relatedForms.map((form, i) => (
+        <div key={i} className="card animate-in" style={{
+          animationDelay: '0.07s',
+          background: 'rgba(156,111,224,0.05)',
+          borderColor: 'rgba(156,111,224,0.3)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span style={{
+              fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 6,
+              background: 'rgba(156,111,224,0.15)', color: '#9C6FE0',
+              border: '1px solid rgba(156,111,224,0.3)',
+            }}>🌰 特殊形态解锁</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#9C6FE0' }}>
+              {form.spirit} → {form.hiddenForm}
+            </span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+            <div style={{ marginBottom: 4 }}>
+              将<strong style={{ color: '#9C6FE0' }}>{form.acornDesc}</strong>放入指定地底护所，可解锁「{form.hiddenForm}」隐藏形态。
+            </div>
+            <div>
+              <span style={{ color: '#5B9CF6', fontWeight: 700 }}>📍 推荐庇护所：</span>
+              <span style={{ color: 'var(--text)', fontWeight: 700 }}>{form.sanctuary}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* 咕噜球库存 */}
       <div className="card animate-in" style={{ animationDelay: '0.09s' }}>
+        {/* 标题行 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <span style={{ fontSize: 13, fontWeight: 800 }}>精灵球库存</span>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>咕噜球库存</span>
           <span style={{
             fontSize: 10, padding: '2px 8px', borderRadius: 20,
             background: 'var(--card-inner)', color: 'var(--text-muted)',
@@ -231,12 +460,71 @@ export default function Checklist({ planId, navigate, goBack }) {
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 10, lineHeight: 1.6 }}>
           填写后，出货时可自动计算本次消耗球数
         </div>
-        <input
-          type="number" inputMode="numeric"
-          value={ballInput} onChange={e => setBallInput(e.target.value)}
-          placeholder="输入当前精灵球数量"
-          className="input-field"
-        />
+
+        {/* 模式切换 */}
+        <div style={{
+          display: 'flex', gap: 6, marginBottom: 12,
+          background: 'var(--card-inner)', borderRadius: 8, padding: 4,
+          border: '1px solid var(--divider)',
+        }}>
+          {[
+            { key: 'simple', label: '不区分球类' },
+            { key: 'byType', label: '区分球类' },
+          ].map(({ key, label }) => {
+            const active = ballMode === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setBallMode(key)}
+                style={{
+                  flex: 1, padding: '6px 0',
+                  borderRadius: 6, border: 'none',
+                  background: active ? '#2B2A2E' : 'transparent',
+                  color: active ? '#FBF7EC' : 'var(--text-muted)',
+                  fontSize: 12, fontWeight: active ? 800 : 600,
+                  fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {ballMode === 'simple' ? (
+          <input
+            type="number" inputMode="numeric"
+            value={ballInput} onChange={e => setBallInput(e.target.value)}
+            placeholder="输入当前咕噜球总数"
+            className="input-field"
+          />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { label: '高级球', value: ballAdv, setter: setBallAdv, color: '#C8830A' },
+              { label: '赛季球', value: ballSea, setter: setBallSea, color: '#7E57C2' },
+              { label: '属性球', value: ballAtt, setter: setBallAtt, color: '#5B9CF6' },
+            ].map(({ label, value, setter, color }) => (
+              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  fontSize: 12, fontWeight: 800, color,
+                  minWidth: 42, flexShrink: 0,
+                }}>{label}</span>
+                <input
+                  type="number" inputMode="numeric"
+                  value={value} onChange={e => setter(e.target.value)}
+                  placeholder="0"
+                  className="input-field"
+                  style={{ flex: 1, margin: 0 }}
+                />
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.6, marginTop: 2 }}>
+              不需要计的球类留空即可
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 开始前确认 */}

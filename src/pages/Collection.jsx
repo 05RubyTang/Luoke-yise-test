@@ -1,9 +1,17 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS, ATTR_SHINIES, SEASON_SHINIES, findPlansForSpirit } from '../data/plans';
+import { PLANS, ATTR_SHINIES, SEASON_SHINIES, findPlansForSpirit, SPECIAL_FORMS } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
-import { FruitLine } from '../components/FruitTag';
+import { getWikiSpiritImg } from '../data/spirits-wiki';
+import { getWikiFruitImg } from '../data/fruits-wiki';
+
+const base = import.meta.env.BASE_URL;
+
+// 精灵名 → 本地图片文件名映射（文件名与精灵名不一致时使用）
+const SPIRIT_IMG_FILE = {
+  '柴渣虫': '燃薪虫',
+};
 
 function getSpiritRecords(name, state) {
   return (state.completedTasks || [])
@@ -17,44 +25,241 @@ function getSpiritRecords(name, state) {
     }));
 }
 
+// 通用图片卡（果实/精灵均用）
+function ImgCard({ src, name, size = 60 }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+      <div style={{
+        width: size, height: size,
+        borderRadius: 12,
+        background: '#F7F7F7',
+        border: '1.5px solid rgba(103,93,83,0.14)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      }}>
+        <img
+          src={src}
+          alt={name}
+          style={{ width: size - 8, height: size - 8, objectFit: 'contain' }}
+          onError={e => { e.target.style.opacity = 0.15; }}
+        />
+      </div>
+      <span style={{
+        fontSize: 10, color: 'var(--text-muted)', fontWeight: 600,
+        textAlign: 'center', lineHeight: 1.3,
+        maxWidth: size + 8,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {name}
+      </span>
+    </div>
+  );
+}
+
+// 支持 wiki 兜底的果实图卡
+function FruitImg({ name, size = 60 }) {
+  const localSrc = `${base}fruits/${encodeURIComponent(name)}.png?v=2`;
+  const wikiSrc = getWikiFruitImg(name);
+  const [src, setSrc] = useState(localSrc);
+  const [triedWiki, setTriedWiki] = useState(false);
+
+  const handleError = (e) => {
+    if (!triedWiki && wikiSrc) {
+      setTriedWiki(true);
+      setSrc(wikiSrc);
+    } else {
+      e.target.style.opacity = 0.15;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+      <div style={{
+        width: size, height: size,
+        borderRadius: 12,
+        background: '#F7F7F7',
+        border: '1.5px solid rgba(103,93,83,0.14)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      }}>
+        <img
+          src={src}
+          alt={name}
+          style={{ width: size - 8, height: size - 8, objectFit: 'contain' }}
+          onError={handleError}
+        />
+      </div>
+      <span style={{
+        fontSize: 10, color: 'var(--text-muted)', fontWeight: 600,
+        textAlign: 'center', lineHeight: 1.3,
+        maxWidth: size + 8,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {name}
+      </span>
+    </div>
+  );
+}
+
+// 支持 wiki 兜底的精灵图卡
+function SpiritImg({ name, size = 60 }) {
+  const fileName = SPIRIT_IMG_FILE[name] || name;
+  const localSrc = `${base}spirits/${encodeURIComponent(fileName)}.png?v=2`;
+  const wikiSrc = getWikiSpiritImg(name);
+  const [src, setSrc] = useState(localSrc);
+  const [triedWiki, setTriedWiki] = useState(false);
+
+  const handleError = (e) => {
+    if (!triedWiki && wikiSrc) {
+      setTriedWiki(true);
+      setSrc(wikiSrc);
+    } else {
+      e.target.style.opacity = 0.15;
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+      <div style={{
+        width: size, height: size,
+        borderRadius: 12,
+        background: '#F7F7F7',
+        border: '1.5px solid rgba(103,93,83,0.14)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+      }}>
+        <img
+          src={src}
+          alt={name}
+          style={{ width: size - 8, height: size - 8, objectFit: 'contain' }}
+          onError={handleError}
+        />
+      </div>
+      <span style={{
+        fontSize: 10, color: 'var(--text-muted)', fontWeight: 600,
+        textAlign: 'center', lineHeight: 1.3,
+        maxWidth: size + 8,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {name}
+      </span>
+    </div>
+  );
+}
+
 function PlanInfo({ plan }) {
-  const cycleText = plan.spiritB
-    ? `抓3只${plan.spiritA} → 抓3只${plan.spiritB} → 循环`
-    : `抓3只${plan.spiritA} → 每3只一轮`;
+  // 展示所有 shinies，SpiritImg 内部会自动处理本地/wiki 兜底
+  const visibleShinies = plan.shinies || [];
+  // 该方案关联的特殊形态（通过 planIds 匹配）
+  const relatedForms = SPECIAL_FORMS.filter(f => f.planIds.includes(plan.id));
 
   return (
     <div style={{
       background: 'var(--card-inner)',
-      borderRadius: 10, padding: 12, marginBottom: 8,
+      borderRadius: 12, padding: '10px 12px 12px', marginBottom: 8,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      {/* 顶部：属性图标 + 方案名 + 同池文案 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
         <div style={{
-          width: 28, height: 28, borderRadius: 7,
+          width: 26, height: 26, borderRadius: 6,
           background: '#F0E8D5',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, overflow: 'hidden', padding: 3,
         }}>
-          <PlanIcon plan={plan} size={20} />
+          <PlanIcon plan={plan} size={18} />
         </div>
-        <span style={{ fontSize: 13, fontWeight: 800 }}>{plan.type}方案</span>
+        <span style={{ fontSize: 13, fontWeight: 800, flexShrink: 0 }}>
+          {plan.season ? plan.type : `${plan.type}方案`}
+        </span>
         {plan.season && (
           <span style={{
             fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 20,
             background: 'rgba(244,143,177,0.15)', color: '#C0568A',
-            border: '1px solid rgba(244,143,177,0.4)',
+            border: '1px solid rgba(244,143,177,0.4)', flexShrink: 0,
           }}>赛季奇遇</span>
         )}
+        {plan.shinies?.length > 0 && (
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+            同池：{plan.shinies.join('、')}
+          </span>
+        )}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 3 }}>
-        果实：<FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
+
+      {/* 果实 + = 精灵 横排 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'nowrap', overflowX: 'auto' }}>
+        {/* 果实A */}
+        {plan.fruitA && <FruitImg name={plan.fruitA} size={60} />}
+
+        {/* + */}
+        {plan.fruitB && (
+          <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-muted)', flexShrink: 0 }}>+</span>
+        )}
+
+        {/* 果实B */}
+        {plan.fruitB && <FruitImg name={plan.fruitB} size={60} />}
+
+        {/* = */}
+        <span style={{ fontSize: 18, fontWeight: 900, color: 'var(--text-muted)', flexShrink: 0 }}>＝</span>
+
+        {/* 有图的精灵 */}
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
+          {visibleShinies.length > 0
+            ? visibleShinies.map(name => <SpiritImg key={name} name={name} size={60} />)
+            : (
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                {plan.shinies?.join('、') || '—'}
+              </span>
+            )
+          }
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 6 }}>循环：{cycleText}</div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>同池：{plan.shinies.join('、')}</div>
+
+      {/* 赛季庇护所 */}
       {plan.season && plan.sanctuary && (
-        <div style={{ fontSize: 11, color: '#5B9CF6', marginTop: 4 }}>
-          📍 「{plan.sanctuary}」
+        <div style={{
+          marginTop: 10, padding: '7px 10px', borderRadius: 8,
+          background: 'rgba(91,156,246,0.07)',
+          border: '1px solid rgba(91,156,246,0.2)',
+          fontSize: 11, lineHeight: 1.6, color: 'var(--text-muted)',
+        }}>
+          <span style={{ color: '#5B9CF6', fontWeight: 800 }}>📍 推荐放置庇护所：</span>
+          <span style={{ color: 'var(--text)', fontWeight: 700 }}>{plan.sanctuary}</span>
+          {plan.sanctuaryTip && (
+            <span style={{ color: 'var(--text-muted)' }}>（{plan.sanctuaryTip}）</span>
+          )}
         </div>
       )}
+
+      {/* 特殊形态庇护所提示（非赛季属性方案，有关联特殊形态时展示） */}
+      {relatedForms.length > 0 && relatedForms.map((form, i) => (
+        <div key={i} style={{
+          marginTop: 8, padding: '8px 10px', borderRadius: 8,
+          background: 'rgba(156,111,224,0.06)',
+          border: '1px solid rgba(156,111,224,0.22)',
+          fontSize: 11, lineHeight: 1.7,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3, flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 6,
+              background: 'rgba(156,111,224,0.15)', color: '#9C6FE0',
+              border: '1px solid rgba(156,111,224,0.3)',
+            }}>🌰 特殊形态</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#2B2A2E' }}>{form.spirit}</span>
+            <span style={{ color: 'var(--text-muted)' }}>→</span>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#9C6FE0' }}>{form.hiddenForm}</span>
+          </div>
+          <div style={{ color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            <span style={{ color: '#5B9CF6', fontWeight: 700 }}>📍 推荐庇护所：</span>
+            <span style={{ color: 'var(--text)', fontWeight: 700 }}>{form.sanctuary}</span>
+          </div>
+          <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+            将{form.acornDesc}放入此底护所，可解锁隐藏形态
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS } from '../data/plans';
+import { PLANS, inferPoolType, POOL_TYPE_CONFIG } from '../data/plans';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
 
@@ -22,11 +22,14 @@ function parseNonNeg(str) {
 }
 
 /** 单次刷取历史卡片 */
-function HistoryCard({ task, index }) {
+function HistoryCard({ task, index, userPlanConfig }) {
   const { dispatch } = useStore();
-  const plan = PLANS.find(p => p.id === task.planId);
+  const plan = PLANS.find(p => p.id === task.planId)
+    || (userPlanConfig || []).find(p => p.id === task.planId) || null;
   const isSuccess = task.resultType !== 'abandoned';
-  const isPool = task.resultType === 'pool';
+  // 三池类型（兼容旧数据：pool/offpool 会通过 inferPoolType 重新推断）
+  const poolType = isSuccess ? inferPoolType(task, plan) : null;
+  const poolCfg  = poolType ? (POOL_TYPE_CONFIG[poolType] || POOL_TYPE_CONFIG.world) : null;
   const breakdowns = task.breakdowns || {};
   const polluted = breakdowns.polluted || 0;
   const original = breakdowns.original || 0;
@@ -162,19 +165,23 @@ function HistoryCard({ task, index }) {
       )}
 
       {/* 出货标签横幅（仅成功时） */}
-      {isSuccess && (
+      {isSuccess && poolCfg && (
         <div style={{
-          background: isPool ? '#2B2A2E' : '#7E57C2',
+          background: poolCfg.bg,
           borderRadius: 8, padding: '6px 12px', marginBottom: 10,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: 6,
         }}>
-          {plan && <PlanIcon plan={plan} size={16} style={{ filter: 'brightness(2)' }} />}
+          {plan && poolType === 'family' && (
+            <PlanIcon plan={plan} size={16} style={{ filter: 'brightness(2)' }} />
+          )}
           <span style={{
-            fontSize: 12, fontWeight: 800, color: '#FBF7EC',
+            fontSize: 12, fontWeight: 800, color: poolCfg.color,
             fontFamily: 'var(--font-display)', letterSpacing: 1,
           }}>
-            {isPool ? `${plan?.type || ''}方案出货` : '歪池出货'}
+            {poolType === 'family'
+              ? `${plan?.type || ''}方案 · ${poolCfg.label}`
+              : poolCfg.label}
           </span>
         </div>
       )}
@@ -285,6 +292,7 @@ function HistoryCard({ task, index }) {
 export default function History() {
   const { state } = useStore();
   const tasks = state.completedTasks || [];
+  const userPlanConfig = state.userPlanConfig || [];
   const successTasks = tasks.filter(t => t.resultType !== 'abandoned');
   const totalShiny = successTasks.length;
   const avgBreaks = totalShiny > 0
@@ -340,7 +348,7 @@ export default function History() {
             ▼ 最近记录
           </div>
           {tasks.map((task, i) => (
-            <HistoryCard key={task.id || i} task={task} index={i} />
+            <HistoryCard key={task.id || i} task={task} index={i} userPlanConfig={userPlanConfig} />
           ))}
         </>
       )}

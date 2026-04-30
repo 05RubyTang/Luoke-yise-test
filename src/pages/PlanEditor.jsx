@@ -4,6 +4,7 @@ import { PLANS, getShinisByAttr } from '../data/plans';
 import { FRUIT_GUIDE_GROUPS, ATTR_CONFIG } from '../data/fruitGuide';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
+import FruitTag from '../components/FruitTag';
 
 // 属性 id → 中文名映射（与 ATTR_OPTIONS 保持一致）
 const ATTR_ID_TO_LABEL = {
@@ -65,6 +66,7 @@ function OwnedFruitPicker({ ownedFruits, onSelect, currentValue, attrLabel, frui
               }}
             >
               {isActive && <span style={{ fontSize: 10 }}>✓</span>}
+              <FruitTag name={fruit} size={16} showName={false} />
               <span>{fruit}</span>
               <span style={{ display: 'inline-flex', gap: 3 }}>
                 {attrs.map(a => <TinyAttrBadge key={a} attr={a} />)}
@@ -287,8 +289,13 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
             </div>
             <div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>果实名</div>
-              <input className="input-field" value={fruitA} onChange={e => setFruitA(e.target.value)}
-                placeholder="如：治愈兔果实" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input className="input-field" value={fruitA} onChange={e => setFruitA(e.target.value)}
+                  placeholder="如：治愈兔果实" style={{ flex: 1 }} />
+                {fruitA.trim() && (
+                  <FruitTag name={fruitA.trim()} size={24} showName={false} />
+                )}
+              </div>
             </div>
           </div>
           {/* 已拥有果实快选（按当前属性系别过滤） */}
@@ -320,8 +327,13 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
             </div>
             <div>
               <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>果实名</div>
-              <input className="input-field" value={fruitB} onChange={e => setFruitB(e.target.value)}
-                placeholder="如：火红尾果实" />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input className="input-field" value={fruitB} onChange={e => setFruitB(e.target.value)}
+                  placeholder="如：火红尾果实" style={{ flex: 1 }} />
+                {fruitB.trim() && (
+                  <FruitTag name={fruitB.trim()} size={24} showName={false} />
+                )}
+              </div>
             </div>
           </div>
           {/* 已拥有果实快选（按属性过滤，排除已选给 A 的） */}

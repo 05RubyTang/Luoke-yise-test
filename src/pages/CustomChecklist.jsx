@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
+import FruitTag from '../components/FruitTag';
 
 export default function CustomChecklist({ navigate, goBack }) {
   const { dispatch } = useStore();
@@ -88,27 +89,38 @@ export default function CustomChecklist({ navigate, goBack }) {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: 0.4 }}>
             果实 A <span style={{ color: 'var(--cta)', fontWeight: 900 }}>*</span>（必填）
           </div>
-          <input
-            type="text"
-            value={fruitA}
-            onChange={e => setFruitA(e.target.value)}
-            placeholder="例：小灵面果实"
-            className="input-field"
-            style={{ borderColor: fruitA.trim() ? 'var(--divider)' : 'rgba(200,131,10,0.4)' }}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="text"
+              value={fruitA}
+              onChange={e => setFruitA(e.target.value)}
+              placeholder="例：小灵面果实"
+              className="input-field"
+              style={{ flex: 1, borderColor: fruitA.trim() ? 'var(--divider)' : 'rgba(200,131,10,0.4)' }}
+            />
+            {fruitA.trim() && (
+              <FruitTag name={fruitA.trim()} size={32} showName={false} />
+            )}
+          </div>
         </div>
 
         <div>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: 0.4 }}>
             果实 B（选填）
           </div>
-          <input
-            type="text"
-            value={fruitB}
-            onChange={e => setFruitB(e.target.value)}
-            placeholder="例：墨鱿士果实（留空则单果实循环）"
-            className="input-field"
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="text"
+              value={fruitB}
+              onChange={e => setFruitB(e.target.value)}
+              placeholder="例：墨鱿士果实（留空则单果实循环）"
+              className="input-field"
+              style={{ flex: 1 }}
+            />
+            {fruitB.trim() && (
+              <FruitTag name={fruitB.trim()} size={32} showName={false} />
+            )}
+          </div>
         </div>
       </div>
 

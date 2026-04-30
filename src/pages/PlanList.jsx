@@ -18,10 +18,10 @@ function PlanSubPicker({ basePlan, userPlans, spirits, onSelect, onClose }) {
   return (
     <>
       {/* 遮罩 */}
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100 }} />
+      <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200 }} />
       {/* Sheet */}
       <div style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 101,
+        position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 201,
         background: 'var(--card)', borderRadius: '18px 18px 0 0',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.18)',
         display: 'flex', flexDirection: 'column',
@@ -313,7 +313,6 @@ function AttrEntryCard({ plan, userPlans, spirits, completedTasks, activeTasks, 
 export default function PlanList({ navigate, mode = 'library', goBack }) {
   const { state } = useStore();
   const [tab, setTab] = useState('attr');
-  const [pickerPlan, setPickerPlan] = useState(null); // picker模式弹出的属性方案
   const activePlanIds = (state.activeTasks || []).map(t => t.planId);
 
   const attrPlans   = PLANS.filter(p => !p.season);
@@ -414,13 +413,8 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
                     isActive={isActive}
                     completedTasks={state.completedTasks}
                     onClick={() => {
-                      // picker 模式：有自定义方案则弹 sheet，否则直接进
-                      const myUserPlans = (state.userPlanConfig || []).filter(p => p.attrId === plan.id);
-                      if (myUserPlans.length > 0) {
-                        setPickerPlan({ basePlan: plan, userPlans: myUserPlans });
-                      } else {
-                        navigate('checklist', { planId: plan.id });
-                      }
+                      // picker 模式：统一直接进 checklist，带上 basePlanId 供「换方案」使用
+                      navigate('checklist', { planId: plan.id, basePlanId: plan.id });
                     }}
                   />
                 )}
@@ -496,21 +490,6 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
         </div>
       )}
 
-      {/* picker 模式：属性子方案选择 sheet */}
-      {pickerPlan && (
-        <PlanSubPicker
-          basePlan={pickerPlan.basePlan}
-          userPlans={pickerPlan.userPlans}
-          spirits={state.spirits}
-          onSelect={(planId) => {
-            setPickerPlan(null);
-            const isActive = activePlanIds.includes(planId);
-            if (isActive) navigate('recorder', { planId });
-            else navigate('checklist', { planId });
-          }}
-          onClose={() => setPickerPlan(null)}
-        />
-      )}
     </div>
   );
 }

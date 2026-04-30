@@ -1,12 +1,14 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import SpiritAvatar from './SpiritAvatar';
 
-export default function ShinySelectModal({ plan, onSelect, onClose }) {
-  const [showInput, setShowInput] = useState(false);
+export default function ShinySelectModal({ plan, onSelect, onClose, hasTabBar = true }) {
+  const hasPoolSpirits = Array.isArray(plan.shinies) && plan.shinies.length > 0;
+  const [showInput, setShowInput] = useState(!hasPoolSpirits);
   const [customName, setCustomName] = useState('');
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
+  return createPortal(
+    <div className={`modal-overlay${hasTabBar ? '' : ' modal-overlay--no-tab'}`} onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
 
@@ -14,48 +16,52 @@ export default function ShinySelectModal({ plan, onSelect, onClose }) {
           ✨ 出了哪只异色？
         </div>
 
-        {/* 方案内精灵 */}
+        {/* 方案内精灵（自定义方案无 shinies 时不渲染） */}
+        {hasPoolSpirits && (
+          <>
+            <div style={{
+              fontSize: 11, color: 'var(--text-muted)',
+              marginBottom: 10, letterSpacing: 0.5, fontWeight: 700,
+            }}>
+              方案内精灵
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 8,
+              marginBottom: 14,
+            }}>
+              {plan.shinies.map(name => (
+                <button
+                  key={name}
+                  onClick={() => onSelect(name)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 12px',
+                    border: '1.5px solid rgba(103,93,83,0.2)',
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--card-inner)',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    color: 'var(--text)', fontWeight: 700, fontSize: 13,
+                    fontFamily: 'var(--font-body)', textAlign: 'left',
+                    boxShadow: '0 2px 0 rgba(103,93,83,0.15)',
+                  }}
+                >
+                  <SpiritAvatar name={name} size={36} showName={false} />
+                  <span style={{ flex: 1 }}>{name}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* 方案外精灵 / 自定义方案直接输入 */}
         <div style={{
           fontSize: 11, color: 'var(--text-muted)',
           marginBottom: 10, letterSpacing: 0.5, fontWeight: 700,
         }}>
-          方案内精灵
-        </div>
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 8,
-          marginBottom: 14,
-        }}>
-          {plan.shinies.map(name => (
-            <button
-              key={name}
-              onClick={() => onSelect(name, true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 12px',
-                border: '1.5px solid rgba(103,93,83,0.2)',
-                borderRadius: 'var(--radius)',
-                background: 'var(--card-inner)',
-                cursor: 'pointer', transition: 'all 0.15s',
-                color: 'var(--text)', fontWeight: 700, fontSize: 13,
-                fontFamily: 'var(--font-body)', textAlign: 'left',
-                boxShadow: '0 2px 0 rgba(103,93,83,0.15)',
-              }}
-            >
-              <SpiritAvatar name={name} size={36} showName={false} />
-              <span style={{ flex: 1 }}>{name}</span>
-            </button>
-          ))}
-        </div>
-
-        {/* 歪池区 */}
-        <div style={{
-          fontSize: 11, color: 'var(--text-muted)',
-          marginBottom: 10, letterSpacing: 0.5, fontWeight: 700,
-        }}>
-          歪池（方案外的意外精灵）
+          {hasPoolSpirits ? '其他精灵（属性池 / 世界池意外收获）' : '输入获得的精灵名'}
         </div>
 
         {!showInput ? (
@@ -76,7 +82,7 @@ export default function ShinySelectModal({ plan, onSelect, onClose }) {
             />
             <button
               disabled={!customName.trim()}
-              onClick={() => customName.trim() && onSelect(customName.trim(), false)}
+              onClick={() => customName.trim() && onSelect(customName.trim())}
               style={{
                 flexShrink: 0,
                 padding: '11px 16px',
@@ -98,6 +104,7 @@ export default function ShinySelectModal({ plan, onSelect, onClose }) {
 
         <button className="modal-close" onClick={onClose}>取消</button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

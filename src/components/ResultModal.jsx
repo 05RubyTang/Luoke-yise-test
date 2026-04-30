@@ -1,6 +1,8 @@
-export default function ResultModal({ onResult, onClose }) {
-  return (
-    <div className="modal-overlay" onClick={onClose}>
+import { createPortal } from 'react-dom';
+
+export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
+  return createPortal(
+    <div className={`modal-overlay${hasTabBar ? '' : ' modal-overlay--no-tab'}`} onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
 
@@ -60,14 +62,23 @@ export default function ResultModal({ onResult, onClose }) {
           </div>
         </button>
 
+        <button className="modal-option" onClick={() => onResult('jelly')}>
+          <span className="modal-option-icon">🍮</span>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>果冻 / 星辰虫</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>仅计入世界池，不计保底次数</div>
+          </div>
+        </button>
+
         <button className="modal-option" onClick={() => onResult('failed')}>
           <span className="modal-option-icon">❌</span>
           <div>
             <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>触发污染失败</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>逃跑/战败，本次不计入</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>逃跑 / 战败，本次完全不计入</div>
           </div>
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

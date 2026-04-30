@@ -1,12 +1,31 @@
 /**
  * FruitTag — 果实标签组件
- * 图片路径：public/fruits/{name}.png
+ * 图片优先级：本地 public/fruits/{name}.png → BWIKI CDN → 金色色块兜底
  * 用法：<FruitTag name="治愈兔果实" size={18} />
  */
+import { useState } from 'react';
+import { getWikiFruitImg } from '../data/fruits-wiki';
+
 const base = import.meta.env.BASE_URL;
 
 function FruitImg({ name, size }) {
-  const src = `${base}fruits/${encodeURIComponent(name)}.png`;
+  const localSrc = `${base}fruits/${encodeURIComponent(name)}.png`;
+  const wikiSrc = getWikiFruitImg(name);
+  const [src, setSrc] = useState(localSrc);
+  const [triedWiki, setTriedWiki] = useState(false);
+
+  const handleError = (e) => {
+    if (!triedWiki && wikiSrc) {
+      setTriedWiki(true);
+      setSrc(wikiSrc);
+    } else {
+      e.currentTarget.style.display = 'none';
+      if (e.currentTarget.nextSibling) {
+        e.currentTarget.nextSibling.style.display = 'inline-block';
+      }
+    }
+  };
+
   return (
     <img
       src={src}
@@ -21,11 +40,7 @@ function FruitImg({ name, size }) {
         flexShrink: 0,
         borderRadius: size * 0.2,
       }}
-      onError={e => {
-        // 加载失败时用金色色块兜底
-        e.currentTarget.style.display = 'none';
-        e.currentTarget.nextSibling && (e.currentTarget.nextSibling.style.display = 'inline-block');
-      }}
+      onError={handleError}
     />
   );
 }

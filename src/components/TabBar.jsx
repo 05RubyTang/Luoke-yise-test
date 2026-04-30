@@ -10,7 +10,7 @@ export default function TabBar({ current, onChange }) {
   return (
     <nav
       className="tabbar"
-      style={{ backgroundImage: `url(${base}tab-bg.png)` }}
+      style={{ backgroundImage: `url(${base}tab-bg.png?v=2)` }}
     >
       {TABS.map(tab => {
         const isActive = current === tab.id;

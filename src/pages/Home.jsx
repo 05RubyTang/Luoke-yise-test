@@ -174,8 +174,19 @@ export default function Home({ navigate }) {
 
       {/* 进行中任务卡片 */}
       {tasks.map((task, idx) => {
-        const plan = PLANS.find(p => p.id === task.planId);
-        if (!plan) return null;
+        const rawPlan = PLANS.find(p => p.id === task.planId)
+          || (state.userPlanConfig || []).find(p => p.id === task.planId);
+        if (!rawPlan) return null;
+        // 自定义方案继承基础属性方案的图标
+        const attrBase = rawPlan.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
+        const plan = {
+          ...rawPlan,
+          type:    rawPlan.type    || rawPlan.label || '自定义方案',
+          iconImg: rawPlan.iconImg || attrBase?.iconImg || null,
+          icon:    rawPlan.icon    || attrBase?.icon    || '✨',
+          fruitA:  rawPlan.fruitA  || '',
+          fruitB:  rawPlan.fruitB  || '',
+        };
         const remaining = 80 - task.shieldBreakCount;
         return (
           <div key={task.planId} className="card active-task-card animate-in" style={{ animationDelay: `${idx * 0.06}s` }}>

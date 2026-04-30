@@ -3,6 +3,16 @@ import { ALL_SHINIES } from './data/plans';
 import { supabase } from './supabase';
 
 const STORAGE_KEY = 'roco-shiny-helper';
+const USERNAME_KEY = 'lk_username';
+
+// ─── 确保 localStorage 里始终有用户名（App 启动时立即执行）───────────────────
+function ensureUsername() {
+  if (!localStorage.getItem(USERNAME_KEY)) {
+    const suffix = Math.floor(1000 + Math.random() * 9000);
+    localStorage.setItem(USERNAME_KEY, `小洛克${suffix}`);
+  }
+}
+ensureUsername();
 
 // ─── 默认 state 结构 ──────────────────────────────────────────────────────────
 function buildDefaultState() {
@@ -60,6 +70,9 @@ function reducer(state, action) {
       if (state.activeTasks.some(t => t.planId === action.planId)) {
         return state;
       }
+      // ballMode: 'simple' | 'byType'
+      // simple 模式：ballStart(number), ballRestocks[{amount, time}]
+      // byType 模式：ballStartByType({adv,sea,att}), ballRestocks[{adv,sea,att,time}]
       const newTask = {
         id: 'task_' + Date.now(),
         planId: action.planId,
@@ -68,7 +81,10 @@ function reducer(state, action) {
         shieldBreaks: [],
         shieldBreakCount: 0,
         failedBreaks: 0,
-        ballStart: action.ballStart || null,
+        ballMode: action.ballMode || 'simple',
+        ballStart: action.ballStart ?? null,           // simple 模式总数
+        ballStartByType: action.ballStartByType ?? null, // byType 模式 {adv,sea,att}
+        ballRestocks: [],   // simple: [{amount,time}]  byType: [{adv,sea,att,time}]
       };
       return {
         ...state,
@@ -76,19 +92,24 @@ function reducer(state, action) {
       };
     }
     case 'RECORD_BREAK': {
+      // jelly（果冻/星辰虫）：记录色块供展示，但不增加保底计数
+      const isJelly = action.result === 'jelly';
       const newBreak = {
         index: 0,
         result: action.result,
+        // spiritName 可选：'original'/'polluted' 记录具体精灵，'shiny'/'jelly' 可为空
+        ...(action.spiritName ? { spiritName: action.spiritName } : {}),
         time: new Date().toISOString(),
       };
       return {
         ...state,
         activeTasks: updateTask(state.activeTasks, action.planId, task => {
-          newBreak.index = task.shieldBreakCount + 1;
+          // jelly 不占保底序号（index 使用当前 count，不自增）
+          newBreak.index = isJelly ? task.shieldBreakCount : task.shieldBreakCount + 1;
           return {
             ...task,
             shieldBreaks: [...task.shieldBreaks, newBreak],
-            shieldBreakCount: task.shieldBreakCount + 1,
+            shieldBreakCount: isJelly ? task.shieldBreakCount : task.shieldBreakCount + 1,
           };
         }),
       };
@@ -107,11 +128,52 @@ function reducer(state, action) {
         ...state,
         activeTasks: updateTask(state.activeTasks, action.planId, task => {
           if (task.shieldBreaks.length === 0) return task;
+          const lastBreak = task.shieldBreaks[task.shieldBreaks.length - 1];
+          const isJelly = lastBreak?.result === 'jelly';
           return {
             ...task,
             shieldBreaks: task.shieldBreaks.slice(0, -1),
-            shieldBreakCount: task.shieldBreakCount - 1,
+            // jelly 不占保底计数，撤销时也不减
+            shieldBreakCount: isJelly ? task.shieldBreakCount : task.shieldBreakCount - 1,
           };
+        }),
+      };
+    }
+    case 'SET_TASK_BALLS': {
+      // 用户最新填入的球数据覆盖 task（无论 task 是新建还是已有）
+      // 同时清空 ballRestocks，因为起始数据变了，之前的补球记录不再准确
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, action.planId, task => ({
+          ...task,
+          ballMode: action.ballMode || 'simple',
+          ballStart: action.ballMode === 'byType' ? null : (action.ballStart ?? null),
+          ballStartByType: action.ballMode === 'byType' ? (action.ballStartByType ?? null) : null,
+          ballRestocks: [],
+        })),
+      };
+    }
+    case 'ADD_BALL_RESTOCK': {
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, action.planId, task => ({
+          ...task,
+          ballRestocks: [...(task.ballRestocks || []), task.ballMode === 'byType'
+            // byType: { adv, sea, att, time }
+            ? { adv: action.adv || 0, sea: action.sea || 0, att: action.att || 0, time: new Date().toISOString() }
+            // simple: { amount, time }
+            : { amount: action.amount || 0, time: new Date().toISOString() }
+          ],
+        })),
+      };
+    }
+    case 'UNDO_BALL_RESTOCK': {
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, action.planId, task => {
+          const restocks = task.ballRestocks || [];
+          if (restocks.length === 0) return task;
+          return { ...task, ballRestocks: restocks.slice(0, -1) };
         }),
       };
     }
@@ -120,17 +182,42 @@ function reducer(state, action) {
       if (!task) return state;
       const breakdowns = { original: 0, polluted: 0, shiny: 0 };
       task.shieldBreaks.forEach(b => { breakdowns[b.result]++; });
-      const ballStart = task.ballStart;
-      const ballEnd = action.ballEnd;
-      const ballsUsed = (ballStart != null && ballEnd != null) ? ballStart - ballEnd : null;
+      // 计算咕噜球消耗（兼容 simple / byType）
+      let ballsUsed = null;
+      let ballsUsedByType = null;
+      if (task.ballMode === 'byType') {
+        const bst = task.ballStartByType || { adv: 0, sea: 0, att: 0 };
+        const bet = action.ballEndByType;       // { adv, sea, att }
+        if (bet) {
+          const restByType = (task.ballRestocks || []).reduce(
+            (s, r) => ({ adv: s.adv + (r.adv || 0), sea: s.sea + (r.sea || 0), att: s.att + (r.att || 0) }),
+            { adv: 0, sea: 0, att: 0 }
+          );
+          ballsUsedByType = {
+            adv: bst.adv + restByType.adv - (bet.adv || 0),
+            sea: bst.sea + restByType.sea - (bet.sea || 0),
+            att: bst.att + restByType.att - (bet.att || 0),
+          };
+          ballsUsed = ballsUsedByType.adv + ballsUsedByType.sea + ballsUsedByType.att;
+        }
+      } else {
+        const ballStart = task.ballStart;
+        const ballEnd = action.ballEnd;
+        const restockTotal = (task.ballRestocks || []).reduce((s, r) => s + (r.amount || 0), 0);
+        ballsUsed = (ballStart != null && ballEnd != null) ? ballStart + restockTotal - ballEnd : null;
+      }
+      const ballStart = task.ballMode === 'byType' ? null : task.ballStart;
+      const ballEnd = task.ballMode === 'byType' ? null : action.ballEnd;
       const completed = {
         id: task.id,
         planId: task.planId,
         resultSpirit: action.spiritName,
-        resultType: action.isPool ? 'pool' : 'offpool',
+        resultType: action.resultType || (action.isPool ? 'pool' : 'offpool'),
         shieldBreakCount: task.shieldBreakCount,
         breakdowns,
+        ballMode: task.ballMode || 'simple',
         ballsUsed,
+        ...(ballsUsedByType ? { ballsUsedByType } : {}),
         completedAt: new Date().toISOString(),
       };
       const newSpirits = { ...state.spirits };
@@ -153,17 +240,44 @@ function reducer(state, action) {
       if (!task) return state;
       const breakdowns = { original: 0, polluted: 0, shiny: 0 };
       task.shieldBreaks.forEach(b => { breakdowns[b.result]++; });
-      const ballStart = task.ballStart;
-      const ballEnd = action.ballEnd;
-      const ballsUsed = (ballStart != null && ballEnd != null) ? ballStart - ballEnd : null;
+      // 计算咕噜球消耗（兼容 simple / byType）
+      let cac_ballsUsed = null;
+      let cac_ballsUsedByType = null;
+      let nextBallStart = null;
+      let nextBallStartByType = null;
+      if (task.ballMode === 'byType') {
+        const bst = task.ballStartByType || { adv: 0, sea: 0, att: 0 };
+        const bet = action.ballEndByType;
+        if (bet) {
+          const restByType = (task.ballRestocks || []).reduce(
+            (s, r) => ({ adv: s.adv + (r.adv || 0), sea: s.sea + (r.sea || 0), att: s.att + (r.att || 0) }),
+            { adv: 0, sea: 0, att: 0 }
+          );
+          cac_ballsUsedByType = {
+            adv: bst.adv + restByType.adv - (bet.adv || 0),
+            sea: bst.sea + restByType.sea - (bet.sea || 0),
+            att: bst.att + restByType.att - (bet.att || 0),
+          };
+          cac_ballsUsed = cac_ballsUsedByType.adv + cac_ballsUsedByType.sea + cac_ballsUsedByType.att;
+          nextBallStartByType = { adv: bet.adv || 0, sea: bet.sea || 0, att: bet.att || 0 };
+        }
+      } else {
+        const ballStart = task.ballStart;
+        const ballEnd = action.ballEnd;
+        const restockTotal = (task.ballRestocks || []).reduce((s, r) => s + (r.amount || 0), 0);
+        cac_ballsUsed = (ballStart != null && ballEnd != null) ? ballStart + restockTotal - ballEnd : null;
+        nextBallStart = ballEnd ?? null;
+      }
       const completed = {
         id: task.id,
         planId: task.planId,
         resultSpirit: action.spiritName,
-        resultType: action.isPool ? 'pool' : 'offpool',
+        resultType: action.resultType || (action.isPool ? 'pool' : 'offpool'),
         shieldBreakCount: task.shieldBreakCount,
         breakdowns,
-        ballsUsed,
+        ballMode: task.ballMode || 'simple',
+        ballsUsed: cac_ballsUsed,
+        ...(cac_ballsUsedByType ? { ballsUsedByType: cac_ballsUsedByType } : {}),
         completedAt: new Date().toISOString(),
       };
       const newSpirits = { ...state.spirits };
@@ -174,17 +288,21 @@ function reducer(state, action) {
           obtainedAt: new Date().toISOString(),
         };
       }
+      const resetBreaks = !!action.resetBreaks;
       return {
         ...state,
         spirits: newSpirits,
         activeTasks: updateTask(state.activeTasks, action.planId, t => ({
           ...t,
           id: 'task_' + Date.now(),
-          shieldBreaks: [],
-          shieldBreakCount: 0,
+          shieldBreaks: resetBreaks ? [] : t.shieldBreaks,
+          shieldBreakCount: resetBreaks ? 0 : t.shieldBreakCount,
           failedBreaks: 0,
           startTime: new Date().toISOString(),
-          ballStart: ballEnd,
+          // 继续刷：上轮剩余作为新的开始
+          ballStart: task.ballMode === 'byType' ? null : nextBallStart,
+          ballStartByType: task.ballMode === 'byType' ? nextBallStartByType : null,
+          ballRestocks: [],
         })),
         completedTasks: [completed, ...state.completedTasks],
       };
@@ -355,6 +473,7 @@ function reducer(state, action) {
         shieldBreakCount: action.shieldBreakCount ?? null,
         breakdowns: action.breakdowns ?? { original: 0, polluted: 0, shiny: 0 },
         ballsUsed: action.ballsUsed ?? null,
+        ...(action.ballsUsedByType ? { ballsUsedByType: action.ballsUsedByType } : {}),
         completedAt: action.completedAt || new Date().toISOString(),
       };
       const newSpirits = { ...state.spirits };

@@ -691,8 +691,8 @@ export default function Profile({ navigate }) {
               }}
             />
 
-            {/* 主信息行：头像 + 昵称 + 状态 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 16px 12px' }}>
+            {/* 主信息行：头像 + 昵称 + 状态（左对齐） */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 16px 12px' }}>
               <AvatarUploader avatarUrl={avatarUrl} onFileChange={handleFileChange} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 {/* 昵称行 */}
@@ -838,23 +838,7 @@ export default function Profile({ navigate }) {
           </div>
 
           {/* ━━ 2. 收集进度核心卡 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div className="card animate-in" style={{ margin: '0 16px 12px', padding: '16px 16px 14px' }}>
-            {/* 大号完成率 */}
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 12 }}>
-              <span style={{
-                fontSize: 42, fontWeight: 900, lineHeight: 1,
-                fontFamily: 'var(--font-display)', color: '#2B2A2E',
-              }}>{completionPct}</span>
-              <span style={{
-                fontSize: 18, fontWeight: 800, color: '#A09080',
-                marginBottom: 4,
-              }}>%</span>
-              <span style={{
-                fontSize: 12, fontWeight: 700, color: 'var(--text-muted)',
-                marginBottom: 6, marginLeft: 2,
-              }}>已收集</span>
-            </div>
-
+          <div className="card animate-in" style={{ margin: '0 16px 12px', padding: '14px 16px 14px' }}>
             {/* 进度条 */}
             <div style={{
               height: 8, borderRadius: 4,

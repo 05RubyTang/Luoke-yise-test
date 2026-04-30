@@ -673,29 +673,30 @@ export default function Profile({ navigate }) {
       {/* ══ 主页：我的 ══════════════════════════════════════════════════════════ */}
       {subPage === null && (
         <>
-          {/* ━━ 1. 用户信息综合卡 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div className="profile-card" style={{
-            position: 'relative', overflow: 'hidden',
-            flexDirection: 'column', gap: 0, padding: 0,
+          {/* ━━ 1+2 合并卡：用户信息 + 收集进度 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          <div className="card animate-in" style={{
+            margin: '0 16px 12px', padding: 0,
+            overflow: 'hidden', position: 'relative',
           }}>
             {/* 迪莫剪影装饰 */}
             <img
               src={`${import.meta.env.BASE_URL}dimo-bg.png`}
               alt="" aria-hidden="true"
               style={{
-                position: 'absolute', right: 20, top: '50%',
-                transform: 'translateY(-55%)',
-                width: 80, height: 80,
-                objectFit: 'contain', opacity: 0.13,
+                position: 'absolute', right: 14, top: 14,
+                width: 72, height: 72,
+                objectFit: 'contain', opacity: 0.10,
                 pointerEvents: 'none', userSelect: 'none',
               }}
             />
 
-            {/* 主信息行：头像 + 昵称 + 状态（左对齐） */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 16px 12px' }}>
+            {/* ── 上半：头像 + 昵称/状态 + 邮箱入口 ── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 16px 14px' }}>
+              {/* 头像 */}
               <AvatarUploader avatarUrl={avatarUrl} onFileChange={handleFileChange} />
+
+              {/* 昵称 + 同步状态 */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                {/* 昵称行 */}
                 {editingName ? (
                   <div className="username-edit-row">
                     <input
@@ -732,7 +733,6 @@ export default function Profile({ navigate }) {
                       onClick={() => { setNameInput(username); setEditingName(true); }}>✎</button>
                   </div>
                 )}
-                {/* 状态行：同步点 + 文字 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
                   <span style={{
                     width: 7, height: 7, borderRadius: '50%',
@@ -742,52 +742,41 @@ export default function Profile({ navigate }) {
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{syncLabel}</span>
                 </div>
               </div>
-            </div>
 
-            {/* 邮箱绑定入口行（分隔线 + 点击展开） */}
-            <button
-              onClick={() => setEmailExpanded(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                width: '100%', padding: '10px 16px',
-                borderTop: '1px solid var(--divider)',
-                background: emailExpanded ? 'rgba(200,131,10,0.05)' : 'transparent',
-                border: 'none', borderTop: '1px solid var(--divider)',
-                cursor: 'pointer', fontFamily: 'var(--font-body)',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15 }}>{isBound ? '✅' : '📧'}</span>
+              {/* 邮箱入口（右侧常驻，点击展开） */}
+              <button
+                onClick={() => setEmailExpanded(v => !v)}
+                style={{
+                  flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6,
+                  background: emailExpanded ? 'rgba(200,131,10,0.08)' : 'var(--card-inner)',
+                  border: `1px solid ${emailExpanded ? 'rgba(200,131,10,0.3)' : 'var(--divider)'}`,
+                  borderRadius: 10, padding: '7px 10px',
+                  cursor: 'pointer', fontFamily: 'var(--font-body)', textAlign: 'left',
+                }}
+              >
+                <span style={{ fontSize: 16, lineHeight: 1 }}>{isBound ? '✅' : '📧'}</span>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: isBound ? 'var(--success)' : '#2B2A2E' }}>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: isBound ? 'var(--success)' : '#2B2A2E', whiteSpace: 'nowrap' }}>
                     {isBound ? '邮箱已绑定' : '绑定邮箱'}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {isBound ? userEmail : '数据云端备份，跨设备恢复'}
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 1, whiteSpace: 'nowrap' }}>
+                    {isBound ? '已云端备份' : '数据云端备份，跨设备恢复'}
                   </div>
                 </div>
-              </div>
-              <span style={{
-                fontSize: 14, color: 'var(--text-muted)',
-                transform: emailExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s',
-                display: 'inline-block',
-              }}>›</span>
-            </button>
+              </button>
+            </div>
 
-            {/* 展开的邮箱操作区 */}
+            {/* ── 展开的邮箱操作区 ── */}
             {emailExpanded && (
               <div style={{
                 padding: '12px 16px 14px',
                 background: '#FFFBF0',
                 borderTop: '1px solid rgba(200,131,10,0.2)',
+                borderBottom: '1px solid rgba(200,131,10,0.12)',
               }}>
                 {!isBound ? (
                   <>
-                    <div style={{
-                      fontSize: 11, color: 'var(--text-light)', lineHeight: 1.7, marginBottom: 10,
-                    }}>
+                    <div style={{ fontSize: 11, color: 'var(--text-light)', lineHeight: 1.7, marginBottom: 10 }}>
                       <span style={{ fontWeight: 700, color: '#C8830A' }}>📌 说明：</span>
                       需从<span style={{ fontWeight: 700 }}>浏览器</span>打开使用，微信渠道暂不支持；每日绑定数量有上限，遇失败请次日再试～
                     </div>
@@ -818,9 +807,9 @@ export default function Profile({ navigate }) {
                   </>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{
-                      fontSize: 11, color: 'var(--text-muted)', fontWeight: 600,
-                    }}>绑定邮箱：<span style={{ color: 'var(--success)', fontWeight: 700 }}>{userEmail}</span></div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                      绑定邮箱：<span style={{ color: 'var(--success)', fontWeight: 700 }}>{userEmail}</span>
+                    </div>
                     <button
                       onClick={() => setShowBindModal(true)}
                       style={{
@@ -835,45 +824,48 @@ export default function Profile({ navigate }) {
                 )}
               </div>
             )}
-          </div>
 
-          {/* ━━ 2. 收集进度核心卡 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          <div className="card animate-in" style={{ margin: '0 16px 12px', padding: '14px 16px 14px' }}>
-            {/* 进度条 */}
-            <div style={{
-              height: 8, borderRadius: 4,
-              background: 'rgba(103,93,83,0.12)',
-              overflow: 'hidden', marginBottom: 12,
-            }}>
+            {/* ── 分隔线 ── */}
+            <div style={{ height: 1, background: 'var(--divider)', margin: '0 16px' }} />
+
+            {/* ── 下半：进度条 + 三格数字 ── */}
+            <div style={{ padding: '14px 16px 16px' }}>
+              {/* 进度条 */}
               <div style={{
-                height: '100%', borderRadius: 4,
-                width: `${completionPct}%`,
-                background: 'linear-gradient(90deg, #4CAF50, #8BC34A)',
-                transition: 'width 0.6s cubic-bezier(.4,0,.2,1)',
-              }} />
-            </div>
+                height: 8, borderRadius: 4,
+                background: 'rgba(103,93,83,0.12)',
+                overflow: 'hidden', marginBottom: 14,
+              }}>
+                <div style={{
+                  height: '100%', borderRadius: 4,
+                  width: `${completionPct}%`,
+                  background: 'linear-gradient(90deg, #4CAF50, #8BC34A)',
+                  transition: 'width 0.6s cubic-bezier(.4,0,.2,1)',
+                }} />
+              </div>
 
-            {/* 已收集 / 待收集 */}
-            <div style={{ display: 'flex', gap: 0 }}>
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#4CAF50', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
-                  {totalObtained}
+              {/* 三格数字 */}
+              <div style={{ display: 'flex', gap: 0 }}>
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#4CAF50', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
+                    {totalObtained}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>已收集</div>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontWeight: 600 }}>已收集</div>
-              </div>
-              <div style={{ width: 1, background: 'var(--divider)', margin: '2px 0' }} />
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#C8830A', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
-                  {totalSpirits - totalObtained}
+                <div style={{ width: 1, background: 'var(--divider)', margin: '2px 0' }} />
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#C8830A', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
+                    {totalSpirits - totalObtained}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>待收集</div>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontWeight: 600 }}>待收集</div>
-              </div>
-              <div style={{ width: 1, background: 'var(--divider)', margin: '2px 0' }} />
-              <div style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: '#2B2A2E', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
-                  {totalSpirits}
+                <div style={{ width: 1, background: 'var(--divider)', margin: '2px 0' }} />
+                <div style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#2B2A2E', lineHeight: 1, fontFamily: 'var(--font-display)' }}>
+                    {totalSpirits}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 5, fontWeight: 600 }}>全部</div>
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, fontWeight: 600 }}>全部</div>
               </div>
             </div>
           </div>

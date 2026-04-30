@@ -585,7 +585,8 @@ function ChangelogModal({ onClose }) {
 
 export default function Profile({ navigate }) {
   const { state, syncStatus, authUser, userId } = useStore();
-  const [tab, setTab] = useState('account'); // 'account' | 'history'
+  // null = 主页，'history' = 刷取记录子页
+  const [subPage, setSubPage] = useState(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showBindModal, setShowBindModal] = useState(false);
   const [bindSentEmail, setBindSentEmail] = useState(null);
@@ -649,25 +650,28 @@ export default function Profile({ navigate }) {
 
   return (
     <div className="page profile-page">
-      {/* 页头 */}
+      {/* 页头 —— 子页时显示返回按钮 */}
       <div className="page-header">
-        <h2>我的</h2>
+        {subPage === 'history' ? (
+          <>
+            <button
+              onClick={() => setSubPage(null)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '4px 8px 4px 0', fontSize: 18, color: 'var(--text)',
+                display: 'flex', alignItems: 'center', gap: 4,
+                fontFamily: 'var(--font-body)', fontWeight: 700,
+              }}
+            >‹</button>
+            <h2 style={{ flex: 1 }}>刷取记录</h2>
+          </>
+        ) : (
+          <h2>我的</h2>
+        )}
       </div>
 
-      {/* 内部 Tab 切换 */}
-      <div className="profile-tabs">
-        <button
-          className={`profile-tab-btn${tab === 'account' ? ' active' : ''}`}
-          onClick={() => setTab('account')}
-        >我的</button>
-        <button
-          className={`profile-tab-btn${tab === 'history' ? ' active' : ''}`}
-          onClick={() => setTab('history')}
-        >刷取记录</button>
-      </div>
-
-      {/* ══ Tab A：我的 ══════════════════════════════════════════════════════════ */}
-      {tab === 'account' && (
+      {/* ══ 主页：我的 ══════════════════════════════════════════════════════════ */}
+      {subPage === null && (
         <>
           {/* ━━ 1. 用户信息综合卡 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <div className="profile-card" style={{
@@ -901,7 +905,7 @@ export default function Profile({ navigate }) {
                 iconBg: 'rgba(75,156,70,0.12)',
                 label: '抓宠记录',
                 desc: '查看历史出货',
-                action: () => setTab('history'),
+                action: () => setSubPage('history'),
               },
               {
                 icon: null,
@@ -930,8 +934,8 @@ export default function Profile({ navigate }) {
                 key={i}
                 onClick={item.action}
                 style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-                  padding: '14px 14px 12px',
+                  display: 'flex', flexDirection: 'row', alignItems: 'center',
+                  gap: 10, padding: '12px 14px',
                   border: '1.5px solid var(--card-border)',
                   borderRadius: 'var(--radius)',
                   background: 'var(--card)',
@@ -940,22 +944,26 @@ export default function Profile({ navigate }) {
                   fontFamily: 'var(--font-body)',
                 }}
               >
+                {/* 图标 */}
                 <div style={{
-                  width: 40, height: 40, borderRadius: 12, marginBottom: 10,
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                   background: item.iconBg,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 22,
+                  fontSize: 20,
                 }}>
                   {item.iconImg
-                    ? <img src={item.iconImg} alt={item.label} width={26} height={26} style={{ objectFit: 'contain' }} />
+                    ? <img src={item.iconImg} alt={item.label} width={24} height={24} style={{ objectFit: 'contain' }} />
                     : item.icon
                   }
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)', marginBottom: 2 }}>
-                  {item.label}
-                </div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  {item.desc}
+                {/* 文字 */}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)', marginBottom: 2, whiteSpace: 'nowrap' }}>
+                    {item.label}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                    {item.desc}
+                  </div>
                 </div>
               </button>
             ))}
@@ -1130,8 +1138,8 @@ export default function Profile({ navigate }) {
         </>
       )}
 
-      {/* ══ Tab B：刷取记录 ═════════════════════════════════════════════════════ */}
-      {tab === 'history' && (
+      {/* ══ 子页：刷取记录 ══════════════════════════════════════════════════════ */}
+      {subPage === 'history' && (
         <div style={{ paddingBottom: 24 }}>
           {/* 汇总统计卡 */}
           {tasks.length > 0 && (

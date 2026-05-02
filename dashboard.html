@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>洛克异色 · 数据看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #F2EAD8;
+      --card: #FBF7EC;
+      --border: #DDD5C4;
+      --text: #1A1814;
+      --text-muted: #675D53;
+      --orange: #C8830A;
+      --orange-light: rgba(200,131,10,0.10);
+      --green: #4B9C46;
+      --green-light: rgba(75,156,70,0.10);
+      --dark: #2B2A2E;
+      --radius: 14px;
+      --shadow: 0 2px 0 #C7B89A;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Password Gate ─────────────────────────────────────────────────────── */
+    #gate {
+      position: fixed; inset: 0; z-index: 999;
+      background: var(--dark);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 20px;
+    }
+    #gate h1 { color: #FBF7EC; font-size: 22px; font-weight: 900; letter-spacing: 1px; }
+    #gate p  { color: rgba(251,247,236,0.5); font-size: 13px; }
+    #gate input {
+      width: 260px; padding: 12px 16px;
+      border-radius: 10px; border: 1.5px solid rgba(251,247,236,0.2);
+      background: rgba(255,255,255,0.08); color: #FBF7EC;
+      font-size: 15px; outline: none; text-align: center;
+    }
+    #gate input:focus { border-color: var(--orange); }
+    #gate button {
+      width: 260px; padding: 12px;
+      background: var(--orange); color: #FBF7EC;
+      border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 800; cursor: pointer;
+    }
+    #gate .err { color: #F56E6E; font-size: 12px; min-height: 16px; }
+
+    /* ── Header ────────────────────────────────────────────────────────────── */
+    header {
+      background: var(--dark); color: #FBF7EC;
+      padding: 18px 24px; display: flex; align-items: center;
+      justify-content: space-between;
+    }
+    header .title { font-size: 18px; font-weight: 900; letter-spacing: 0.5px; }
+    header .sync  { font-size: 11px; color: rgba(251,247,236,0.5); }
+    header .sync.ready { color: #7ED47A; }
+    header .sync.error { color: #F56E6E; }
+
+    /* ── Layout ────────────────────────────────────────────────────────────── */
+    main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+
+    section { margin-bottom: 28px; }
+    section h2 {
+      font-size: 13px; font-weight: 800; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Stat Cards ────────────────────────────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+    .stat-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .stat-card .label { font-size: 11px; color: var(--text-muted); font-weight: 700; margin-bottom: 8px; }
+    .stat-card .value {
+      font-size: 32px; font-weight: 900; line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-card .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+    .stat-card.orange .value { color: var(--orange); }
+    .stat-card.green  .value { color: var(--green); }
+    .stat-card.dark   .value { color: var(--dark); }
+
+    /* ── Charts Row ────────────────────────────────────────────────────────── */
+    .charts-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 640px) { .charts-row { grid-template-columns: 1fr; } }
+
+    .chart-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .chart-card h3 {
+      font-size: 12px; font-weight: 800; color: var(--text-muted);
+      margin-bottom: 14px; letter-spacing: 0.5px;
+    }
+    .chart-card canvas { width: 100% !important; }
+
+    /* ── Leaderboard Tables ────────────────────────────────────────────────── */
+    .lb-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 12px;
+    }
+    .lb-card {
+      background: var(--card); border: 1.5px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .lb-card .lb-head {
+      padding: 12px 14px; font-size: 12px; font-weight: 800;
+      color: #FBF7EC; letter-spacing: 0.5px;
+    }
+    .lb-card.orange .lb-head { background: var(--orange); }
+    .lb-card.green  .lb-head { background: var(--green); }
+    .lb-card.dark   .lb-head { background: var(--dark); }
+
+    .lb-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .lb-row:last-child { border-bottom: none; }
+    .lb-row .rank {
+      font-size: 11px; font-weight: 900; color: var(--text-muted);
+      width: 20px; flex-shrink: 0; text-align: center;
+    }
+    .lb-row .rank.top { color: var(--orange); font-size: 14px; }
+    .lb-row .name {
+      flex: 1; font-weight: 700; overflow: hidden;
+      text-overflow: ellipsis; white-space: nowrap;
+    }
+    .lb-row .val {
+      font-weight: 900; font-size: 14px; flex-shrink: 0;
+    }
+    .lb-row .unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; }
+
+    /* ── Loading skeleton ──────────────────────────────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, #E8DFD0 25%, #D8CFBF 50%, #E8DFD0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 6px; height: 32px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    .loading-text { text-align: center; color: var(--text-muted); padding: 20px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- 密码门 -->
+<div id="gate">
+  <h1>🔐 数据看板</h1>
+  <p>仅管理员可访问</p>
+  <input id="pwd" type="password" placeholder="输入密码" autofocus>
+  <button onclick="checkPwd()">进入看板</button>
+  <div class="err" id="pErr"></div>
+</div>
+
+<!-- 主体 -->
+<div id="app" style="display:none">
+  <header>
+    <div class="title">洛克异色 · 数据看板</div>
+    <div class="sync" id="syncLabel">加载中…</div>
+  </header>
+
+  <main>
+
+    <!-- 总览数字 -->
+    <section>
+      <h2>整体概览</h2>
+      <div class="stat-grid">
+        <div class="stat-card dark">
+          <div class="label">总用户数</div>
+          <div class="value" id="s-total">—</div>
+          <div class="sub">累计注册</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="label">今日活跃</div>
+          <div class="value" id="s-today">—</div>
+          <div class="sub" id="s-today-sub">今天</div>
+        </div>
+        <div class="stat-card dark">
+          <div class="label">总破盾次数</div>
+          <div class="value" id="s-breaks">—</div>
+          <div class="sub">所有用户累计</div>
+        </div>
+        <div class="stat-card green">
+          <div class="label">总异色数</div>
+          <div class="value" id="s-yise">—</div>
+          <div class="sub">所有用户累计</div>
+        </div>
+        <div class="stat-card orange">
+          <div class="label">全局出货率</div>
+          <div class="value" id="s-rate">—</div>
+          <div class="sub">异色数 / 破盾数</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 图表行 -->
+    <section>
+      <h2>趋势 & 分布</h2>
+      <div class="charts-row">
+        <div class="chart-card">
+          <h3>用户增长趋势（近 30 天）</h3>
+          <canvas id="growthChart" height="180"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>平台分布</h3>
+          <canvas id="platformChart" height="180"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- 排行榜 -->
+    <section>
+      <h2>排行榜</h2>
+      <div class="lb-grid">
+
+        <!-- 异色收集榜 -->
+        <div class="lb-card orange">
+          <div class="lb-head">🏆 异色收集榜（Top 20）</div>
+          <div id="lb-yise"><div class="loading-text">加载中…</div></div>
+        </div>
+
+        <!-- 最勤奋用户 -->
+        <div class="lb-card dark">
+          <div class="lb-head">⚡ 最勤奋用户 · 破盾榜（Top 20）</div>
+          <div id="lb-breaks"><div class="loading-text">加载中…</div></div>
+        </div>
+
+        <!-- 出货率榜 -->
+        <div class="lb-card green">
+          <div class="lb-head">🍀 出货率榜（≥100次破盾）</div>
+          <div id="lb-rate"><div class="loading-text">加载中…</div></div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+// ── 配置 ──────────────────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://gcjtgvlosykgjhyutbak.supabase.co';
+const SUPABASE_KEY  = 'sb_publishable_CaKAC_pzlSBJOlZMeaxwVg_jppWi69R';
+const DASHBOARD_PWD = 'luoke2025';   // ← 可以改成你想要的密码
+
+// ── 密码验证 ──────────────────────────────────────────────────────────────────
+function checkPwd() {
+  const v = document.getElementById('pwd').value.trim();
+  if (v === DASHBOARD_PWD) {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display  = 'block';
+    initDashboard();
+  } else {
+    document.getElementById('pErr').textContent = '密码错误，请重试';
+    document.getElementById('pwd').value = '';
+    document.getElementById('pwd').focus();
+  }
+}
+document.getElementById('pwd').addEventListener('keydown', e => {
+  if (e.key === 'Enter') checkPwd();
+});
+
+// ── 初始化 Supabase ───────────────────────────────────────────────────────────
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── 工具函数 ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = n => n == null ? '—' : Number(n).toLocaleString('zh-CN');
+const rankEmoji = i => i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : String(i + 1);
+
+function getVal(user, key) {
+  // 优先用顶层列，回退到 data JSON 字段
+  const top = user[key];
+  if (top != null) return Number(top);
+  const fromJson = user.data?.[key];
+  if (fromJson != null) return Number(fromJson);
+  return 0;
+}
+function getStr(user, key) {
+  return user[key] ?? user.data?.[key] ?? null;
+}
+
+// ── 主流程 ────────────────────────────────────────────────────────────────────
+async function initDashboard() {
+  const syncEl = $('syncLabel');
+  syncEl.textContent = '同步中…';
+  syncEl.className = 'sync';
+
+  try {
+    // 拉取全量用户数据（只取需要的列）
+    const { data: users, error } = await sb
+      .from('user_data')
+      .select('user_name, user_email, yise_count, total_breaks, platform, created_at, last_active_at, data')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+
+    // 补全每个用户的统计字段（兼容顶层列 / JSON 回退）
+    const list = (users || []).map(u => ({
+      name:     getStr(u, 'user_name') || '匿名用户',
+      email:    u.user_email || '',
+      yise:     getVal(u, 'yise_count'),
+      breaks:   getVal(u, 'total_breaks'),
+      platform: getStr(u, 'platform') || 'unknown',
+      createdAt: u.created_at,
+      activeAt:  u.last_active_at,
+    }));
+
+    renderStats(list);
+    renderGrowthChart(list);
+    renderPlatformChart(list);
+    renderLeaderboards(list);
+
+    const now = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    syncEl.textContent = `已同步 ${now}`;
+    syncEl.className = 'sync ready';
+  } catch (err) {
+    syncEl.textContent = '加载失败：' + err.message;
+    syncEl.className = 'sync error';
+    console.error(err);
+  }
+}
+
+// ── 总览数字 ──────────────────────────────────────────────────────────────────
+function renderStats(list) {
+  const today = new Date().toISOString().slice(0, 10);
+  const todayActive = list.filter(u => u.activeAt?.startsWith(today)).length;
+  const totalBreaks = list.reduce((s, u) => s + u.breaks, 0);
+  const totalYise   = list.reduce((s, u) => s + u.yise, 0);
+  const rate = totalBreaks > 0 ? (totalYise / totalBreaks * 100).toFixed(1) + '%' : '—';
+
+  $('s-total').textContent  = fmt(list.length);
+  $('s-today').textContent  = fmt(todayActive);
+  $('s-breaks').textContent = fmt(totalBreaks);
+  $('s-yise').textContent   = fmt(totalYise);
+  $('s-rate').textContent   = rate;
+  $('s-today-sub').textContent = today;
+}
+
+// ── 用户增长折线图 ─────────────────────────────────────────────────────────────
+function renderGrowthChart(list) {
+  // 近 30 天
+  const days = [];
+  const counts = [];
+  const today = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    days.push(key.slice(5));   // MM-DD
+    const cnt = list.filter(u => u.createdAt?.startsWith(key)).length;
+    counts.push(cnt);
+  }
+
+  new Chart($('growthChart'), {
+    type: 'line',
+    data: {
+      labels: days,
+      datasets: [{
+        label: '新增用户',
+        data: counts,
+        borderColor: '#C8830A',
+        backgroundColor: 'rgba(200,131,10,0.10)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#C8830A',
+        fill: true,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          grid: { color: 'rgba(103,93,83,0.08)' },
+          ticks: { font: { size: 10 }, color: '#675D53', maxRotation: 0,
+            callback: (_, i) => i % 5 === 0 ? days[i] : '' },
+        },
+        y: {
+          grid: { color: 'rgba(103,93,83,0.08)' },
+          ticks: { font: { size: 10 }, color: '#675D53', precision: 0 },
+          beginAtZero: true,
+        }
+      }
+    }
+  });
+}
+
+// ── 平台分布饼图 ──────────────────────────────────────────────────────────────
+function renderPlatformChart(list) {
+  const mobile  = list.filter(u => u.platform === 'mobile').length;
+  const desktop = list.filter(u => u.platform === 'desktop').length;
+  const other   = list.length - mobile - desktop;
+
+  const labels = ['手机', '电脑'];
+  const data   = [mobile, desktop];
+  if (other > 0) { labels.push('未知'); data.push(other); }
+
+  new Chart($('platformChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: ['#C8830A', '#2B2A2E', '#A09080'],
+        borderColor: '#FBF7EC',
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { font: { size: 12 }, color: '#675D53', padding: 12 }
+        }
+      },
+      cutout: '60%',
+    }
+  });
+}
+
+// ── 排行榜 ────────────────────────────────────────────────────────────────────
+function renderLeaderboards(list) {
+  // 1. 异色收集榜
+  const byYise = [...list]
+    .filter(u => u.yise > 0)
+    .sort((a, b) => b.yise - a.yise)
+    .slice(0, 20);
+  renderLb('lb-yise', byYise, u => ({
+    val: fmt(u.yise), unit: '只'
+  }));
+
+  // 2. 破盾榜
+  const byBreaks = [...list]
+    .filter(u => u.breaks > 0)
+    .sort((a, b) => b.breaks - a.breaks)
+    .slice(0, 20);
+  renderLb('lb-breaks', byBreaks, u => ({
+    val: fmt(u.breaks), unit: '次'
+  }));
+
+  // 3. 出货率榜（破盾 ≥ 100）
+  const byRate = [...list]
+    .filter(u => u.breaks >= 100 && u.yise > 0)
+    .map(u => ({ ...u, rate: u.yise / u.breaks * 100 }))
+    .filter(u => u.rate >= 0)
+    .sort((a, b) => b.rate - a.rate)
+    .slice(0, 20);
+  renderLb('lb-rate', byRate, u => ({
+    val: u.rate.toFixed(1) + '%', unit: ''
+  }));
+}
+
+function renderLb(elId, rows, getDisplay) {
+  const el = $(elId);
+  if (!rows.length) {
+    el.innerHTML = '<div class="loading-text" style="color:#A09080">暂无数据</div>';
+    return;
+  }
+  el.innerHTML = rows.map((u, i) => {
+    const { val, unit } = getDisplay(u);
+    const isTop = i < 3;
+    return `
+      <div class="lb-row">
+        <span class="rank ${isTop ? 'top' : ''}">${rankEmoji(i)}</span>
+        <span class="name" title="${u.email || u.name}">${u.name}</span>
+        <span class="val">${val}<span class="unit">${unit}</span></span>
+      </div>`;
+  }).join('');
+}
+</script>
+
+</body>
+</html>

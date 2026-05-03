@@ -57,7 +57,7 @@ export default function FruitGuide({ goBack }) {
     <div style={{ paddingBottom: 32 }}>
       {/* 顶部 */}
       <div className="page-header">
-        <button className="back-btn" onClick={goBack}>←</button>
+        <button className="back-btn" onClick={goBack}><img src={`${import.meta.env.BASE_URL}back-icon.png`} alt="返回" /></button>
         <span className="page-header-title">果实解锁攻略</span>
       </div>
 

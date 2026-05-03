@@ -58,7 +58,7 @@ export default function CustomChecklist({ navigate, goBack }) {
     <div style={{ paddingBottom: 24 }}>
       {/* 顶部 */}
       <div className="page-header">
-        <button className="back-btn" onClick={goBack}>←</button>
+        <button className="back-btn" onClick={goBack}><img src={`${import.meta.env.BASE_URL}back-icon.png`} alt="返回" /></button>
         <span className="page-header-title">自定义刷取方案</span>
       </div>
 

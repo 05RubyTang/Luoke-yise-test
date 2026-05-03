@@ -141,7 +141,7 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
     <div style={{ paddingBottom: 24 }}>
       {/* 顶部 */}
       <div className="page-header">
-        <button className="back-btn" onClick={goBack}>←</button>
+        <button className="back-btn" onClick={goBack}><img src={`${import.meta.env.BASE_URL}back-icon.png`} alt="返回" /></button>
         <span className="page-header-title">确认方案</span>
         {/* 「换方案」按钮：仅当有多个可选方案时才显示 */}
         {switcherOptions && switcherOptions.length > 1 && (

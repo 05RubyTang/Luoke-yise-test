@@ -949,24 +949,27 @@ body {
   gap: 8px;
 }
 .back-btn {
-  border: 1.5px solid var(--card-border-light);
-  background: var(--card);
-  border-radius: 10px;
+  border: none;
+  background: none;
+  padding: 0;
   width: 36px;
   height: 36px;
-  font-size: 16px;
   cursor: pointer;
-  color: var(--text);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
-  box-shadow: 0 2px 0 var(--card-border-light);
+  transition: transform 0.15s;
   flex-shrink: 0;
+  box-shadow: none;
+}
+.back-btn img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  display: block;
 }
 .back-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 0 var(--card-border-light);
+  transform: scale(0.92);
 }
 .page-header-title {
   font-size: 16px;

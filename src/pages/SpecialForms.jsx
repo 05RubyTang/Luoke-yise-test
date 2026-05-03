@@ -230,7 +230,7 @@ export default function SpecialForms({ goBack }) {
   return (
     <div style={{ paddingBottom: 32 }}>
       <div className="page-header">
-        <button className="back-btn" onClick={goBack}>←</button>
+        <button className="back-btn" onClick={goBack}><img src={`${import.meta.env.BASE_URL}back-icon.png`} alt="返回" /></button>
         <span className="page-header-title">特殊形态精灵攻略</span>
       </div>
 

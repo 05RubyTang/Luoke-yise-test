@@ -660,7 +660,7 @@ export default function Profile({ navigate }) {
           objectFit: 'cover', objectPosition: 'center top',
           opacity: 1,
           pointerEvents: 'none', userSelect: 'none',
-          zIndex: 0,
+          zIndex: -1,
         }}
       />
       {/* 页头 —— 子页时显示返回按钮 */}

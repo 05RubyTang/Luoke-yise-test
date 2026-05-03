@@ -691,8 +691,8 @@ export default function Profile({ navigate }) {
             src={`${import.meta.env.BASE_URL}dimo-mask.png`}
             alt="" aria-hidden="true"
             style={{
-              position: 'absolute', left: 16, top: -36,
-              width: 110, height: 'auto',
+              position: 'absolute', left: 16, top: 17,
+              width: 60, height: 'auto',
               pointerEvents: 'none', userSelect: 'none',
               zIndex: 1,
             }}

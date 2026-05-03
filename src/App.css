@@ -762,21 +762,21 @@ body {
 .collection-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+  gap: 7px;
   padding: 0 16px;
 }
 .collection-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
   transition: all 0.15s;
   background: var(--card);
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-card);
-  padding: 10px 6px 8px;
+  padding: 8px 4px 7px;
 }
 .collection-item:active { transform: scale(0.94); }
 

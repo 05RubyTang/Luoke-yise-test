@@ -954,7 +954,7 @@ export default function Profile({ navigate }) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>📢</span>
+                <img src={`${import.meta.env.BASE_URL}announcement-icon.png`} alt="" style={{ width: 20, height: 'auto' }} />
                 <span style={{ fontSize: 13, fontWeight: 800, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>
                   更新公告
                 </span>

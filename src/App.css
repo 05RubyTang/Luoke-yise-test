@@ -165,7 +165,7 @@ body {
    通用卡片
    ==================================================== */
 .card {
-  background: #FBF7EC;
+  background: #ffffff;
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);
   padding: 16px;
@@ -1689,7 +1689,7 @@ body {
 /* ── Section 容器 ── */
 .profile-section {
   margin: 0 16px 12px;
-  background: var(--card);
+  background: #ffffff;
   border: 1.5px solid var(--card-border);
   border-radius: var(--radius);
   padding: 14px 16px;
@@ -1837,7 +1837,7 @@ body {
 .dev-note-section {}
 
 .dev-note-card {
-  background: linear-gradient(135deg, rgba(200,131,10,0.06) 0%, rgba(43,42,46,0.04) 100%);
+  background: #ffffff;
   border: 1.5px solid rgba(200,131,10,0.18);
   border-radius: var(--radius);
   padding: 16px;

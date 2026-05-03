@@ -969,7 +969,7 @@ export default function Profile({ navigate }) {
                 width: '100%', padding: '13px 16px',
                 border: '1.5px solid var(--card-border)',
                 borderRadius: guideExpanded ? '12px 12px 0 0' : 'var(--radius)',
-                background: 'var(--card)',
+                background: '#ffffff',
                 boxShadow: guideExpanded ? 'none' : 'var(--shadow-card)',
                 cursor: 'pointer', fontFamily: 'var(--font-body)',
                 boxSizing: 'border-box',
@@ -994,7 +994,7 @@ export default function Profile({ navigate }) {
                 border: '1.5px solid var(--card-border)',
                 borderTop: 'none',
                 borderRadius: '0 0 12px 12px',
-                background: 'var(--card-inner)',
+                background: '#ffffff',
                 padding: '0 0 4px',
               }}>
                 {/* 版本 & 更新公告 */}

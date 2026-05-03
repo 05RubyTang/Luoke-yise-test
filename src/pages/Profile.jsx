@@ -671,11 +671,9 @@ export default function Profile({ navigate }) {
               onClick={() => setSubPage(null)}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
-                padding: '4px 8px 4px 0', fontSize: 18, color: 'var(--text)',
-                display: 'flex', alignItems: 'center', gap: 4,
-                fontFamily: 'var(--font-body)', fontWeight: 700,
+                padding: 0, display: 'flex', alignItems: 'center',
               }}
-            >‹</button>
+            ><img src={`${import.meta.env.BASE_URL}back-icon.png`} alt="返回" style={{ width: 36, height: 36 }} /></button>
             <h2 style={{ flex: 1 }}>刷取记录</h2>
           </>
         ) : (

@@ -548,26 +548,24 @@ export default function Recorder({ planId, navigate }) {
         </div>
       )}
 
-      {/* 触发污染色块 */}
-      {task.shieldBreaks.length > 0 && (
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span style={{ fontSize: 13, fontWeight: 800 }}>触发污染记录</span>
-            <div style={{ display: 'flex', gap: 10, fontSize: 11, fontWeight: 600 }}>
-              <span style={{ color: 'var(--success)' }}>
-                原色精灵 {task.shieldBreaks.filter(b => b.result === 'original').length}
-              </span>
-              <span style={{ color: 'var(--polluted)' }}>
-                污染精灵 {task.shieldBreaks.filter(b => b.result === 'polluted').length}
-              </span>
-              <span style={{ color: 'var(--gold)' }}>
-                🌟异色精灵 {task.shieldBreaks.filter(b => b.result === 'shiny').length}
-              </span>
-            </div>
+      {/* 触发污染色块（始终显示，0 条记录时显示空格子） */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>触发污染记录</span>
+          <div style={{ display: 'flex', gap: 10, fontSize: 11, fontWeight: 600 }}>
+            <span style={{ color: 'var(--success)' }}>
+              原色精灵 {task.shieldBreaks.filter(b => b.result === 'original').length}
+            </span>
+            <span style={{ color: 'var(--polluted)' }}>
+              污染精灵 {task.shieldBreaks.filter(b => b.result === 'polluted').length}
+            </span>
+            <span style={{ color: 'var(--gold)' }}>
+              🌟异色精灵 {task.shieldBreaks.filter(b => b.result === 'shiny').length}
+            </span>
           </div>
-          <ShieldDots breaks={task.shieldBreaks} />
         </div>
-      )}
+        <ShieldDots breaks={task.shieldBreaks} max={100} />
+      </div>
 
       {/* ── 双列卡：保底进度 + 咕噜球 ── */}
       <div style={{ display: 'flex', gap: 10, padding: '0 16px', marginBottom: 0 }}>

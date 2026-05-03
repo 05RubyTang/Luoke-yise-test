@@ -599,7 +599,7 @@ export default function Profile({ navigate }) {
   // ── 邮箱绑定入口展开状态 ──
   const [emailExpanded, setEmailExpanded] = useState(false);
 
-  // ── 使用说明折叠状态 ──
+  // ── 更新公告折叠状态 ──
   const [guideExpanded, setGuideExpanded] = useState(false);
 
   // ── 问题反馈 ──
@@ -947,7 +947,7 @@ export default function Profile({ navigate }) {
             ))}
           </div>
 
-          {/* ━━ 4. 使用说明（折叠） ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {/* ━━ 4. 更新公告（折叠） ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           <div style={{ margin: '0 16px 12px' }}>
             <button
               onClick={() => setGuideExpanded(v => !v)}
@@ -963,9 +963,9 @@ export default function Profile({ navigate }) {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16 }}>📖</span>
+                <span style={{ fontSize: 16 }}>📢</span>
                 <span style={{ fontSize: 13, fontWeight: 800, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>
-                  使用说明
+                  更新公告
                 </span>
               </div>
               <span style={{

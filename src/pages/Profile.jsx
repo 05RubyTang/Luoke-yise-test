@@ -655,9 +655,9 @@ export default function Profile({ navigate }) {
         src={`${import.meta.env.BASE_URL}profile-bg.png`}
         alt="" aria-hidden="true"
         style={{
-          position: 'absolute', inset: 0,
-          width: '100%', height: '100%',
-          objectFit: 'cover', objectPosition: 'center top',
+          position: 'absolute', top: 0, left: '50%',
+          transform: 'translateX(-50%)',
+          width: 390, height: 'auto',
           opacity: 1,
           pointerEvents: 'none', userSelect: 'none',
           zIndex: -1,

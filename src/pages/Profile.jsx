@@ -915,19 +915,19 @@ export default function Profile({ navigate }) {
                   display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
                   justifyContent: 'flex-end',
                   gap: 6, padding: '12px 14px 12px',
-                  height: 100,
+                  height: 82,
                   border: '2px solid #2B2A2E',
                   borderRadius: 16,
                   background: '#ffffff',
                   boxShadow: '0 3px 0 #2B2A2E',
                   cursor: 'pointer', textAlign: 'left',
                   fontFamily: 'var(--font-body)',
-                  overflow: 'hidden',
+                  overflow: 'visible',
                 }}
               >
                 {/* 黄色圆形装饰 */}
                 <div style={{
-                  position: 'absolute', right: -18, bottom: -18,
+                  position: 'absolute', right: -30, bottom: -18,
                   width: 100, height: 100, borderRadius: '50%',
                   background: '#F5C842',
                   zIndex: 0,
@@ -937,7 +937,7 @@ export default function Profile({ navigate }) {
                   src={`${import.meta.env.BASE_URL}${item.cardImg}`}
                   alt=""
                   style={{
-                    position: 'absolute', right: -4, bottom: -4,
+                    position: 'absolute', right: -16, bottom: -4,
                     height: 90, width: 'auto',
                     objectFit: 'contain',
                     zIndex: 1,

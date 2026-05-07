@@ -1,7 +1,30 @@
+import { useState } from 'react';
 import { useStore } from '../store';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import { FruitLine } from '../components/FruitTag';
+
+function isFruitReady(plan, ownedFruits) {
+  const owned = new Set(ownedFruits || []);
+  if (!plan.fruitA) return true;
+  return owned.has(plan.fruitA) && (!plan.fruitB || owned.has(plan.fruitB));
+}
+
+function FruitMissingBadge() {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: 9, fontWeight: 800,
+      color: '#B05800',
+      background: 'rgba(200,100,0,0.10)',
+      border: '1px solid rgba(200,100,0,0.25)',
+      borderRadius: 6, padding: '1px 6px',
+      whiteSpace: 'nowrap', flexShrink: 0,
+    }}>
+      🌰 果实未集齐
+    </span>
+  );
+}
 
 function formatDate(isoStr) {
   if (!isoStr) return '';
@@ -10,9 +33,11 @@ function formatDate(isoStr) {
 }
 
 export default function MyCustomPlans({ goBack }) {
-  const { state } = useStore();
-  const userPlans = state.userPlanConfig || [];
+  const { state, dispatch } = useStore();
+  const [deletingPlan, setDeletingPlan] = useState(null); // { plan, taskCount }
+  const userPlans = (state.userPlanConfig || []).filter(p => !p.deleted);
   const completedTasks = state.completedTasks || [];
+  const ownedFruits = state.ownedFruits || [];
 
   // 只展示用户自定义方案（有 id 的）
   // 对每个方案：聚合成功出货记录
@@ -40,8 +65,59 @@ export default function MyCustomPlans({ goBack }) {
     return new Date(b.latestTask.completedAt) - new Date(a.latestTask.completedAt);
   });
 
+  const handleDeleteConfirm = () => {
+    if (!deletingPlan) return;
+    dispatch({ type: 'DELETE_USER_PLAN', id: deletingPlan.plan.id });
+    setDeletingPlan(null);
+  };
+
   return (
     <div className="page">
+      {/* 删除确认弹窗 */}
+      {deletingPlan && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 1000,
+          background: 'rgba(0,0,0,0.45)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '0 24px',
+        }} onClick={() => setDeletingPlan(null)}>
+          <div style={{
+            background: '#FBF7EC', borderRadius: 20, padding: '24px 20px',
+            width: '100%', maxWidth: 320,
+            boxShadow: '0 8px 32px rgba(43,42,46,0.18)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 17, fontWeight: 900, color: '#2B2A2E', marginBottom: 8, fontFamily: 'var(--font-display)' }}>
+              删除「{deletingPlan.plan.label || deletingPlan.plan.type || '自定义方案'}」？
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 20 }}>
+              {deletingPlan.taskCount > 0
+                ? `该方案下有 ${deletingPlan.taskCount} 条抓宠记录，删除后记录仍会保留在历史中，但不再关联到此方案。`
+                : '该方案还没有抓宠记录，删除后不可恢复。'}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => setDeletingPlan(null)}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 12,
+                  border: '1.5px solid var(--divider)', background: 'transparent',
+                  fontSize: 14, fontWeight: 700, color: 'var(--text-muted)',
+                  cursor: 'pointer', fontFamily: 'var(--font-body)',
+                }}
+              >取消</button>
+              <button
+                onClick={handleDeleteConfirm}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 12,
+                  border: 'none', background: '#E8453C',
+                  fontSize: 14, fontWeight: 700, color: '#fff',
+                  cursor: 'pointer', fontFamily: 'var(--font-body)',
+                }}
+              >删除</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 页头 */}
       <div className="page-header">
         <button
@@ -143,9 +219,10 @@ export default function MyCustomPlans({ goBack }) {
                   }}>
                     {plan.label || plan.type || '自定义方案'}
                   </div>
-                  {/* 果实信息 */}
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, marginBottom: 1 }}>
+                  {/* 果实信息 + 未集齐标记 */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, marginBottom: 1, flexWrap: 'wrap' }}>
                     <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={13} />
+                    {!isFruitReady(plan, ownedFruits) && <FruitMissingBadge />}
                   </div>
                   <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, fontWeight: 500 }}>
                     {latestTask
@@ -153,15 +230,26 @@ export default function MyCustomPlans({ goBack }) {
                       : '暂无出货记录'}
                   </div>
                 </div>
-                {/* 出货次数徽章 */}
-                <div style={{
-                  flexShrink: 0,
-                  background: planTasks.length > 0 ? '#2B2A2E' : 'rgba(103,93,83,0.08)',
-                  color: planTasks.length > 0 ? '#FBF7EC' : 'var(--text-muted)',
-                  borderRadius: 20, padding: '3px 10px',
-                  fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-display)',
-                }}>
-                  {planTasks.length} 次
+                {/* 右侧：出货次数徽章 + 删除按钮 */}
+                <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <div style={{
+                    background: planTasks.length > 0 ? '#2B2A2E' : 'rgba(103,93,83,0.08)',
+                    color: planTasks.length > 0 ? '#FBF7EC' : 'var(--text-muted)',
+                    borderRadius: 20, padding: '3px 10px',
+                    fontSize: 11, fontWeight: 800, fontFamily: 'var(--font-display)',
+                  }}>
+                    {planTasks.length} 次
+                  </div>
+                  <button
+                    onClick={() => setDeletingPlan({ plan, taskCount: planTasks.length })}
+                    style={{
+                      padding: '3px 9px', borderRadius: 8,
+                      border: 'none', background: 'rgba(232,69,60,0.10)',
+                      color: '#E8453C', fontSize: 11, fontWeight: 700,
+                      cursor: 'pointer', flexShrink: 0,
+                      fontFamily: 'var(--font-body)',
+                    }}
+                  >删除方案</button>
                 </div>
               </div>
 

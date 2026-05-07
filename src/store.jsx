@@ -438,9 +438,15 @@ function reducer(state, action) {
       }
     }
     case 'DELETE_USER_PLAN': {
+      // 墓碑标记：不直接移除，而是标记 deleted=true + deletedAt
+      // 防止 mergeStates 在刷新时从云端把已删方案"并集"回来
       return {
         ...state,
-        userPlanConfig: (state.userPlanConfig || []).filter(p => p.id !== action.id),
+        userPlanConfig: (state.userPlanConfig || []).map(p =>
+          p.id === action.id
+            ? { ...p, deleted: true, deletedAt: new Date().toISOString() }
+            : p
+        ),
       };
     }
     case 'TOGGLE_OWNED_FRUIT': {
@@ -563,15 +569,23 @@ function mergeStates(local, cloud) {
     }
   });
 
-  // userPlanConfig：按 id 去重，本地版本优先（本地编辑时间更新）
+  // userPlanConfig：按 id 去重，deleted 墓碑优先，否则取 updatedAt 更新的那个
+  // 规则：任一侧标记 deleted=true，则该方案视为已删除，不复活
   const planMap = new Map();
   [...(cloud.userPlanConfig || []), ...(local.userPlanConfig || [])].forEach(p => {
-    if (!planMap.has(p.id)) planMap.set(p.id, p);
-    else {
-      // 同 id 取 updatedAt 更新的那个
+    if (!planMap.has(p.id)) {
+      planMap.set(p.id, p);
+    } else {
       const existing = planMap.get(p.id);
-      if (p.updatedAt && (!existing.updatedAt || p.updatedAt > existing.updatedAt)) {
-        planMap.set(p.id, p);
+      // 任一侧有 deleted 标记 → 保留 deleted 的那个（墓碑不可逆）
+      if (p.deleted || existing.deleted) {
+        const winner = p.deleted ? p : existing;
+        planMap.set(p.id, winner);
+      } else {
+        // 两侧都未删除 → 取 updatedAt 更新的那个
+        if (p.updatedAt && (!existing.updatedAt || p.updatedAt > existing.updatedAt)) {
+          planMap.set(p.id, p);
+        }
       }
     }
   });

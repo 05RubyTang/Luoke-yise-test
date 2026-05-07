@@ -66,6 +66,33 @@ function PlanSubPicker({ basePlan, userPlans, onSelect, onClose }) {
 }
 
 /* ─── 工具函数 ─────────────────────────────────────────────────────────────── */
+
+/** 判断一个方案的果实条件是否已满足（fruitA/fruitB 是否均在 ownedFruits 中） */
+function isFruitReady(plan, ownedFruits) {
+  const owned = new Set(ownedFruits || []);
+  if (!plan.fruitA) return true; // 无果实信息视为满足
+  const aOk = owned.has(plan.fruitA);
+  const bOk = !plan.fruitB || owned.has(plan.fruitB);
+  return aOk && bOk;
+}
+
+/** 果实未集齐标记 */
+function FruitMissingBadge() {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: 9, fontWeight: 800,
+      color: '#B05800',
+      background: 'rgba(200,100,0,0.10)',
+      border: '1px solid rgba(200,100,0,0.25)',
+      borderRadius: 6, padding: '1px 6px',
+      whiteSpace: 'nowrap', flexShrink: 0,
+    }}>
+      🌰 果实未集齐
+    </span>
+  );
+}
+
 function calcPlanAvgBreaks(planId, completedTasks) {
   if (!completedTasks?.length) return null;
   const relevant = completedTasks.filter(t => t.planId === planId && t.resultType !== 'abandoned' && t.shieldBreakCount != null);
@@ -109,7 +136,7 @@ const STATUS_CFG = {
 };
 
 /* ─── 方案卡（属性混抓）── 点击直接进二级页 ─────────────────────────────────── */
-function AttrPlanCard({ plan, userPlans, spirits, completedTasks, activeTasks, onClick, pinned }) {
+function AttrPlanCard({ plan, userPlans, spirits, completedTasks, activeTasks, onClick, pinned, fruitReady }) {
   const shinies = getShinisByAttr(plan.id);
   const obtainedCount = shinies.filter(s => spirits[s]?.obtained).length;
   const allObtained = shinies.length > 0 && obtainedCount === shinies.length;
@@ -192,7 +219,8 @@ function AttrPlanCard({ plan, userPlans, spirits, completedTasks, activeTasks, o
             <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginRight: 4 }}>果实：</span>
             <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
           </div>
-          {!isNoShiny && (avgInfo
+          {!fruitReady && <FruitMissingBadge />}
+          {!isNoShiny && fruitReady && (avgInfo
             ? <span style={{ fontSize: 9, color: '#8B5C00', fontWeight: 700, flexShrink: 0 }}>均 <span style={{ fontSize: 11, fontFamily: 'var(--font-display)' }}>{avgInfo.avg}</span> 次破盾</span>
             : <span style={{ fontSize: 9, color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0 }}>暂无记录</span>
           )}
@@ -244,7 +272,7 @@ function AttrPlanCard({ plan, userPlans, spirits, completedTasks, activeTasks, o
   );
 }
 /* ─── 方案卡（赛季奇遇）── 点击直接进二级页 ──────────────────────────────────── */
-function SeasonPlanCard({ plan, spirits, completedTasks, activeTasks, onClick, subtitle }) {
+function SeasonPlanCard({ plan, spirits, completedTasks, activeTasks, onClick, subtitle, fruitReady }) {
   const status = getSeasonPlanStatus(plan, spirits, activeTasks);
   const avgInfo = calcPlanAvgBreaks(plan.id, completedTasks);
   const allObtained = plan.shinies.length > 0 && plan.shinies.every(n => spirits[n]?.obtained);
@@ -293,10 +321,11 @@ function SeasonPlanCard({ plan, spirits, completedTasks, activeTasks, onClick, s
             <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginRight: 4 }}>果实：</span>
             <FruitLine fruitA={plan.fruitA} fruitB={null} size={14} />
           </div>
-          {avgInfo
+          {!fruitReady && <FruitMissingBadge />}
+          {fruitReady && (avgInfo
             ? <span style={{ fontSize: 9, color: '#8B5C00', fontWeight: 700, flexShrink: 0 }}>均 <span style={{ fontSize: 11, fontFamily: 'var(--font-display)' }}>{avgInfo.avg}</span> 次破盾</span>
             : <span style={{ fontSize: 9, color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0 }}>暂无记录</span>
-          }
+          )}
         </div>
         {/* 精灵头像 + 查看详情文字 */}
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -336,18 +365,24 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   const seasonPlans      = PLANS.filter(p => p.season);
   const singleSpiritPlans = PLANS.filter(p => p.singleSpirit);
 
-  // 计算每类方案的状态
+  // 已拥有果实
+  const ownedFruits = state.ownedFruits || [];
+
+  // 计算每类方案的状态 + 果实是否集齐
   const attrWithStatus = attrPlans.map(p => ({
     plan: p,
     status: getPlanStatus(p, state.spirits, state.activeTasks),
+    fruitReady: isFruitReady(p, ownedFruits),
   }));
   const seasonWithStatus = seasonPlans.map(p => ({
     plan: p,
     status: getSeasonPlanStatus(p, state.spirits, state.activeTasks),
+    fruitReady: isFruitReady(p, ownedFruits),
   }));
   const singleWithStatus = singleSpiritPlans.map(p => ({
     plan: p,
     status: getSeasonPlanStatus(p, state.spirits, state.activeTasks),
+    fruitReady: isFruitReady(p, ownedFruits),
   }));
 
   const allWithStatus = [...attrWithStatus, ...seasonWithStatus, ...singleWithStatus];
@@ -358,16 +393,21 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   const idleCount   = allWithStatus.filter(x => x.status === 'idle').length;
 
   // 用户自定义方案
-  const userPlans = state.userPlanConfig || [];
+  const userPlans = (state.userPlanConfig || []).filter(p => !p.deleted);
 
   // 进行中的 planId（固定置顶）
   const activePlanIds = new Set((state.activeTasks || []).map(t => t.planId));
 
-  // 排序：进行中 → 未开始 → 已完成
-  const sortOrder = { active: 0, idle: 1, done: 2 };
-  const sortedAttr   = [...attrWithStatus].sort((a, b) => sortOrder[a.status] - sortOrder[b.status]);
-  const sortedSeason = [...seasonWithStatus].sort((a, b) => sortOrder[a.status] - sortOrder[b.status]);
-  const sortedSingle = [...singleWithStatus].sort((a, b) => sortOrder[a.status] - sortOrder[b.status]);
+  // 排序：进行中 → 未开始(果实齐) → 未开始(果实缺) → 已完成
+  const sortKey = ({ status, fruitReady }) => {
+    if (status === 'active') return 0;
+    if (status === 'idle' && fruitReady)  return 1;
+    if (status === 'idle' && !fruitReady) return 2;
+    return 3; // done
+  };
+  const sortedAttr   = [...attrWithStatus].sort((a, b) => sortKey(a) - sortKey(b));
+  const sortedSeason = [...seasonWithStatus].sort((a, b) => sortKey(a) - sortKey(b));
+  const sortedSingle = [...singleWithStatus].sort((a, b) => sortKey(a) - sortKey(b));
 
   // library 模式分类显示控制
   const showAttr      = filter === 'all' || filter === 'attr';
@@ -794,7 +834,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>属性混抓</span>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>{attrPlans.length} 个</span>
           </div>
-          {sortedAttr.map(({ plan }) => (
+          {sortedAttr.map(({ plan, fruitReady }) => (
             <AttrPlanCard
               key={plan.id}
               plan={plan}
@@ -803,6 +843,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
               completedTasks={state.completedTasks}
               activeTasks={state.activeTasks}
               pinned={activePlanIds.has(plan.id)}
+              fruitReady={fruitReady}
               onClick={() => navigate('attrPlanDetail', { planId: plan.id })}
             />
           ))}
@@ -816,13 +857,14 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>单刷奇遇</span>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>{seasonPlans.length} 个</span>
           </div>
-          {sortedSeason.map(({ plan }) => (
+          {sortedSeason.map(({ plan, fruitReady }) => (
             <SeasonPlanCard
               key={plan.id}
               plan={plan}
               spirits={state.spirits}
               completedTasks={state.completedTasks}
               activeTasks={state.activeTasks}
+              fruitReady={fruitReady}
               onClick={() => navigate('checklist', { planId: plan.id })}
             />
           ))}
@@ -836,13 +878,14 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>单刷异色</span>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>{singleSpiritPlans.length} 个</span>
           </div>
-          {sortedSingle.map(({ plan }) => (
+          {sortedSingle.map(({ plan, fruitReady }) => (
             <SeasonPlanCard
               key={plan.id}
               plan={plan}
               spirits={state.spirits}
               completedTasks={state.completedTasks}
               activeTasks={state.activeTasks}
+              fruitReady={fruitReady}
               subtitle="单刷异色 · 专属果实"
               onClick={() => navigate('checklist', { planId: plan.id })}
             />

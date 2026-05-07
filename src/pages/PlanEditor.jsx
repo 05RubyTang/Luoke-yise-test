@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { PLANS, getShinisByAttr } from '../data/plans';
-import { FRUIT_GUIDE_GROUPS, ATTR_CONFIG } from '../data/fruitGuide';
+import { getAllEntries, ATTR_CONFIG } from '../data/fruitGuide';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
 import FruitTag from '../components/FruitTag';
@@ -126,11 +126,9 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
   // 构建 fruit → spirit / attrs 映射
   const fruitSpiritMap = {};
   const fruitAttrsMap = {};
-  FRUIT_GUIDE_GROUPS.forEach(g => {
-    g.entries.forEach(e => {
-      fruitSpiritMap[e.fruit] = e.spirit;
-      fruitAttrsMap[e.fruit] = e.attrs || [];
-    });
+  getAllEntries().forEach(e => {
+    fruitSpiritMap[e.fruit] = e.spirit;
+    fruitAttrsMap[e.fruit] = e.attrs || [];
   });
   const ownedFruits = rawOwned.filter(f => fruitSpiritMap[f]); // 只展示攻略库里有的
   const currentAttrLabel = ATTR_ID_TO_LABEL[attrId] || '';

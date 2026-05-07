@@ -140,6 +140,7 @@ export const FRUITS_WIKI_IMG = {
   "嗜光嗡嗡果实": "https://patchwiki.biligame.com/images/rocom/2/2e/649ecx7pi9lrl0o9gw5yti4ojhuyzm9.png",
   "小箱怪果实": "https://patchwiki.biligame.com/images/rocom/9/92/71uio6chmmg26u55xgt9nv7c8qnq88b.png",
   "鸭吉吉果实（燃了鸭）": "https://patchwiki.biligame.com/images/rocom/6/64/a8fstyv022ewzge5ligokjnt6xsha0f.png",
+  "鸭吉吉果实": "https://patchwiki.biligame.com/images/rocom/6/64/a8fstyv022ewzge5ligokjnt6xsha0f.png",
   "十字蝌蚪果实": "https://patchwiki.biligame.com/images/rocom/e/ec/qd3s5v6cof61o01he9xy4ozh0l5m3a1.png",
   "墨鱿士果实": "https://patchwiki.biligame.com/images/rocom/e/e2/k8i5gxyf4wxfzsa00lsw6ybecdrtyk7.png",
   "布瓜蝌果实": "https://patchwiki.biligame.com/images/rocom/0/0a/4o740wh2voqheuv8pebbtuhg8bt6m5a.png",
@@ -150,10 +151,12 @@ export const FRUITS_WIKI_IMG = {
   // 以下果实 bwiki 无独立页面，按进化链/同族共用关系对应正确果实图
   "火焰猿果实":   "https://patchwiki.biligame.com/images/rocom/c/c6/mqkzqm1sqkemx7y6mnqvlzufmrzafgh.png", // 与可爱猿果实相同
   "尖嘴狐仙果实": "https://patchwiki.biligame.com/images/rocom/7/7f/pa3zm1znhxejbmvskbjhojmsnhad9pl.png", // 与灵狐果实相同
-  // 波多西/蹦蹦花/独角兽 bwiki 无页面，暂用通用果实道具图标
+  // 波多西/蹦蹦花 bwiki 无页面，暂用通用果实道具图标
   "波多西果实":   "https://patchwiki.biligame.com/images/rocom/f/fb/dd4np19ke066xpmv89ygh8plkpr2i2f.png",
   "蹦蹦花果实":   "https://patchwiki.biligame.com/images/rocom/f/fb/dd4np19ke066xpmv89ygh8plkpr2i2f.png",
+  // 独角兽果实 = 小独角兽果实（同一道具图标）
   "独角兽果实":   "https://patchwiki.biligame.com/images/rocom/f/fb/dd4np19ke066xpmv89ygh8plkpr2i2f.png",
+  "小独角兽果实": "https://patchwiki.biligame.com/images/rocom/f/fb/dd4np19ke066xpmv89ygh8plkpr2i2f.png",
   // 注：哭哭菇果实/小夜果实/绒绒果实 已在上方有正确条目，此处删除重复键
 };
 

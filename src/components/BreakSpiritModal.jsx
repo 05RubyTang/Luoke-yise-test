@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import SpiritAvatar from './SpiritAvatar';
-import { FRUIT_GUIDE_GROUPS } from '../data/fruitGuide';
+import { getAllEntries } from '../data/fruitGuide';
 
 const getModalRoot = () => document.getElementById('modal-root') || document.body;
 
 // fruit → spirit 映射（用果实名反查正确精灵名，防止 plan.spiritX 被用户填错）
 const FRUIT_SPIRIT_MAP = {};
-FRUIT_GUIDE_GROUPS.forEach(g => g.entries.forEach(e => { FRUIT_SPIRIT_MAP[e.fruit] = e.spirit; }));
+getAllEntries().forEach(e => { FRUIT_SPIRIT_MAP[e.fruit] = e.spirit; });
 
 // 快捷精灵卡片（复用 ShinySelectModal 相同样式）
 function SpiritCard({ name, label, onClick }) {

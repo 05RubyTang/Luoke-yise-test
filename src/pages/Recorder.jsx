@@ -979,13 +979,11 @@ export default function Recorder({ planId, navigate }) {
 
       {/* 三池机制说明 */}
       <div style={{
-        position: 'relative',
         margin: '4px 16px 16px',
         borderRadius: 12,
+        border: '1.5px solid rgba(103,93,83,0.18)',
+        background: '#F8F4EC',
         overflow: 'hidden',
-        backgroundImage: `url(${import.meta.env.BASE_URL}card-frame-compact.png)`,
-        backgroundSize: '100% 100%',
-        backgroundRepeat: 'no-repeat',
       }}>
         {/* 标题栏 */}
         <div style={{
@@ -997,7 +995,7 @@ export default function Recorder({ planId, navigate }) {
           📖 官方三池机制说明
         </div>
         {/* 内容 */}
-        <div style={{ padding: '10px 14px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ padding: '10px 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             {
               dot: '#C8830A',

@@ -1,19 +1,23 @@
 /**
  * Service Worker — 图片预缓存 + Cache First + 自动更新通知
  *
- * 图片缓存策略：
- *   install 阶段：预缓存关键 UI 图（用户打开即可用，无需等待懒加载）
- *   运行时：Cache First —— 命中缓存直接返回；未命中先网络再缓存
+ * ── 设计原则 ──────────────────────────────────────────────────────────────────
+ * 图片缓存（IMG_CACHE）与 SW 版本完全解耦：
+ *   · IMG_CACHE 使用固定名称，SW 更新时不清空，图片缓存永久复用
+ *   · 静态图片 URL 不变则内容不变，旧缓存完全有效，无需随 SW 版本失效
  *
- * 自动更新：新版本 SW 激活后，向所有页面广播 SW_UPDATED，
- *   页面收到消息后自动 reload，用户无需手动刷新。
+ * 自动更新：
+ *   · SW 更新后等待页面进入后台（visibilityState=hidden）再 reload
+ *   · 避免用户正在操作时被打断，也避免白屏
+ *
+ * install 阶段：预缓存 24 张关键 UI 图
+ *   · 精灵图/果实图按需 Cache First 懒加载，无需预缓存
  */
 
-const CACHE_VERSION = 'v4';
-const IMG_CACHE = `luoke-images-${CACHE_VERSION}`;
+// 图片缓存：固定名称，不随 SW 版本变化，避免每次更新清空缓存
+const IMG_CACHE = 'luoke-images';
 
 // ── 关键 UI 图预缓存列表（WebP 优先，体积比 PNG 小 80-95%）────────────────────
-// 只列首屏 / 高频出现的图，精灵图等按需懒加载即可
 const PRECACHE_URLS = [
   'bg.webp',
   'home-page-bg.webp',
@@ -45,25 +49,29 @@ const PRECACHE_URLS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(IMG_CACHE).then(cache =>
-      // 逐一 fetch，单个失败不影响整体安装
       Promise.allSettled(
         PRECACHE_URLS.map(url =>
-          fetch(url, { cache: 'no-cache' })
-            .then(res => { if (res.ok) cache.put(url, res); })
-            .catch(() => {/* 预缓存失败静默跳过 */})
+          // 已在缓存中的跳过，只补充缺失的
+          cache.match(url).then(cached => {
+            if (cached) return;
+            return fetch(url, { cache: 'no-cache' })
+              .then(res => { if (res.ok) cache.put(url, res); })
+              .catch(() => {});
+          })
         )
       )
     ).then(() => self.skipWaiting())
   );
 });
 
-// ── 激活：清旧缓存 → 接管页面 → 广播"有新版本" ──────────────────────────────
+// ── 激活：接管页面 → 广播"有新版本"（不清图片缓存！）────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
+    // 只清理旧版本格式的缓存名（luoke-images-v*），保留当前 luoke-images
     caches.keys()
       .then(keys => Promise.all(
         keys
-          .filter(k => k.startsWith('luoke-images-') && k !== IMG_CACHE)
+          .filter(k => /^luoke-images-v\d+$/.test(k))
           .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())

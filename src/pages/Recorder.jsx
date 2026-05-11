@@ -299,7 +299,7 @@ export default function Recorder({ planId, navigate }) {
           )}
         </div>
         {/* 正常内容区 */}
-        <div style={{ padding: '12px 14px 14px' }}>
+        <div style={{ padding: '12px 14px 22px' }}>
         <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 3 }}>
           <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
         </div>
@@ -997,7 +997,7 @@ export default function Recorder({ planId, navigate }) {
           📖 官方三池机制说明
         </div>
         {/* 内容 */}
-        <div style={{ padding: '10px 14px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ padding: '10px 14px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {[
             {
               dot: '#C8830A',

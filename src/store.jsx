@@ -5,6 +5,17 @@ import { supabase } from './supabase';
 const STORAGE_KEY = 'roco-shiny-helper';
 const USERNAME_KEY = 'lk_username';
 
+// ─── 设备 ID：每台浏览器唯一，写入 localStorage 后永久保留 ──────────────────
+// 仅用于追踪数据来源设备，不影响任何业务逻辑
+const DEVICE_ID = (() => {
+  let id = localStorage.getItem('lk_device_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('lk_device_id', id);
+  }
+  return id;
+})();
+
 // ─── 确保 localStorage 里始终有用户名（App 启动时立即执行）───────────────────
 function ensureUsername() {
   if (!localStorage.getItem(USERNAME_KEY)) {
@@ -24,6 +35,7 @@ function buildDefaultState() {
     spirits,
     fruitProgress: {},
     activeTasks: [],
+    abandonedPlanIds: [], // 已主动删除的 activeTasks planId 墓碑（防止刷新后从云端复活）
     completedTasks: [],
     userPlanConfig: [],   // 用户自定义方案列表
     ownedFruits: [],      // 已拥有的果实名称列表（果实攻略页标记）
@@ -42,9 +54,14 @@ function getLocalState() {
         delete parsed.activeTask;
       }
       if (!parsed.activeTasks) parsed.activeTasks = [];
+      if (!Array.isArray(parsed.abandonedPlanIds)) parsed.abandonedPlanIds = [];
 
       // 与默认值合并：确保新增字段对旧数据自动补全
       const defaults = buildDefaultState();
+      // 过滤掉存量的 abandoned 记录（已废弃，不再写入，存量需清理）
+      if (Array.isArray(parsed.completedTasks)) {
+        parsed.completedTasks = parsed.completedTasks.filter(t => t.resultType !== 'abandoned');
+      }
       return {
         ...defaults,          // 先铺默认值（兜底所有新增顶层字段）
         ...parsed,            // 再用旧数据覆盖（保留已有内容）
@@ -85,6 +102,7 @@ function reducer(state, action) {
         ballStart: action.ballStart ?? null,           // simple 模式总数
         ballStartByType: action.ballStartByType ?? null, // byType 模式 {adv,sea,att}
         ballRestocks: [],   // simple: [{amount,time}]  byType: [{adv,sea,att,time}]
+        pauseSegments: [],  // 暂停计球历史段：simple [{consumed,time}] / byType [{adv,sea,att,time}]
       };
       return {
         ...state,
@@ -167,6 +185,57 @@ function reducer(state, action) {
         })),
       };
     }
+    // 暂停计球：结算本段消耗，重置起始球数，任务保持进行中
+    case 'PAUSE_BALL_SEGMENT': {
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, action.planId, task => {
+          const restocks = task.ballRestocks || [];
+          let consumed = null;
+          let consumedByType = null;
+          if (task.ballMode === 'byType') {
+            const bst = task.ballStartByType || { adv: 0, sea: 0, att: 0 };
+            const restByType = restocks.reduce(
+              (s, r) => ({ adv: s.adv + (r.adv || 0), sea: s.sea + (r.sea || 0), att: s.att + (r.att || 0) }),
+              { adv: 0, sea: 0, att: 0 }
+            );
+            const cur = action.currentByType || { adv: 0, sea: 0, att: 0 };
+            consumedByType = {
+              adv: bst.adv + restByType.adv - (cur.adv || 0),
+              sea: bst.sea + restByType.sea - (cur.sea || 0),
+              att: bst.att + restByType.att - (cur.att || 0),
+            };
+            consumed = consumedByType.adv + consumedByType.sea + consumedByType.att;
+          } else {
+            const restockTotal = restocks.reduce((s, r) => s + (r.amount || 0), 0);
+            const cur = action.current ?? null;
+            consumed = (task.ballStart != null && cur != null) ? task.ballStart + restockTotal - cur : null;
+          }
+          const seg = task.ballMode === 'byType'
+            ? { ...consumedByType, consumed, time: new Date().toISOString() }
+            : { consumed, time: new Date().toISOString() };
+          return {
+            ...task,
+            // 重置为暂停时填入的当前球数，作为下段起点
+            ballStart: task.ballMode === 'byType' ? null : (action.current ?? null),
+            ballStartByType: task.ballMode === 'byType' ? (action.currentByType ?? null) : null,
+            ballRestocks: [],
+            pauseSegments: [...(task.pauseSegments || []), seg],
+          };
+        }),
+      };
+    }
+    // 手动修改开始球数（不清空 ballRestocks / pauseSegments）
+    case 'UPDATE_BALL_START': {
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, action.planId, task => ({
+          ...task,
+          ballStart: action.ballMode === 'byType' ? task.ballStart : (action.ballStart ?? task.ballStart),
+          ballStartByType: action.ballMode === 'byType' ? (action.ballStartByType ?? task.ballStartByType) : task.ballStartByType,
+        })),
+      };
+    }
     case 'UNDO_BALL_RESTOCK': {
       return {
         ...state,
@@ -185,6 +254,9 @@ function reducer(state, action) {
       // 计算咕噜球消耗（兼容 simple / byType）
       let ballsUsed = null;
       let ballsUsedByType = null;
+      // 历史暂停段消耗
+      const pauseSegs = task.pauseSegments || [];
+      const pauseTotal = pauseSegs.reduce((s, seg) => s + (seg.consumed || 0), 0);
       if (task.ballMode === 'byType') {
         const bst = task.ballStartByType || { adv: 0, sea: 0, att: 0 };
         const bet = action.ballEndByType;       // { adv, sea, att }
@@ -193,10 +265,20 @@ function reducer(state, action) {
             (s, r) => ({ adv: s.adv + (r.adv || 0), sea: s.sea + (r.sea || 0), att: s.att + (r.att || 0) }),
             { adv: 0, sea: 0, att: 0 }
           );
-          ballsUsedByType = {
+          const curSegByType = {
             adv: bst.adv + restByType.adv - (bet.adv || 0),
             sea: bst.sea + restByType.sea - (bet.sea || 0),
             att: bst.att + restByType.att - (bet.att || 0),
+          };
+          // 加上历史段
+          const pauseByType = pauseSegs.reduce(
+            (s, seg) => ({ adv: s.adv + (seg.adv || 0), sea: s.sea + (seg.sea || 0), att: s.att + (seg.att || 0) }),
+            { adv: 0, sea: 0, att: 0 }
+          );
+          ballsUsedByType = {
+            adv: curSegByType.adv + pauseByType.adv,
+            sea: curSegByType.sea + pauseByType.sea,
+            att: curSegByType.att + pauseByType.att,
           };
           ballsUsed = ballsUsedByType.adv + ballsUsedByType.sea + ballsUsedByType.att;
         }
@@ -204,7 +286,8 @@ function reducer(state, action) {
         const ballStart = task.ballStart;
         const ballEnd = action.ballEnd;
         const restockTotal = (task.ballRestocks || []).reduce((s, r) => s + (r.amount || 0), 0);
-        ballsUsed = (ballStart != null && ballEnd != null) ? ballStart + restockTotal - ballEnd : null;
+        const curSeg = (ballStart != null && ballEnd != null) ? ballStart + restockTotal - ballEnd : null;
+        ballsUsed = curSeg != null ? curSeg + pauseTotal : (pauseTotal > 0 ? pauseTotal : null);
       }
       const ballStart = task.ballMode === 'byType' ? null : task.ballStart;
       const ballEnd = task.ballMode === 'byType' ? null : action.ballEnd;
@@ -215,6 +298,7 @@ function reducer(state, action) {
         resultType: action.resultType || (action.isPool ? 'pool' : 'offpool'),
         shieldBreakCount: task.shieldBreakCount,
         breakdowns,
+        shieldBreaks: task.shieldBreaks || [],
         ballMode: task.ballMode || 'simple',
         ballsUsed,
         ...(ballsUsedByType ? { ballsUsedByType } : {}),
@@ -245,6 +329,8 @@ function reducer(state, action) {
       let cac_ballsUsedByType = null;
       let nextBallStart = null;
       let nextBallStartByType = null;
+      const cac_pauseSegs = task.pauseSegments || [];
+      const cac_pauseTotal = cac_pauseSegs.reduce((s, seg) => s + (seg.consumed || 0), 0);
       if (task.ballMode === 'byType') {
         const bst = task.ballStartByType || { adv: 0, sea: 0, att: 0 };
         const bet = action.ballEndByType;
@@ -253,10 +339,19 @@ function reducer(state, action) {
             (s, r) => ({ adv: s.adv + (r.adv || 0), sea: s.sea + (r.sea || 0), att: s.att + (r.att || 0) }),
             { adv: 0, sea: 0, att: 0 }
           );
-          cac_ballsUsedByType = {
+          const curSegByType = {
             adv: bst.adv + restByType.adv - (bet.adv || 0),
             sea: bst.sea + restByType.sea - (bet.sea || 0),
             att: bst.att + restByType.att - (bet.att || 0),
+          };
+          const pauseByType = cac_pauseSegs.reduce(
+            (s, seg) => ({ adv: s.adv + (seg.adv || 0), sea: s.sea + (seg.sea || 0), att: s.att + (seg.att || 0) }),
+            { adv: 0, sea: 0, att: 0 }
+          );
+          cac_ballsUsedByType = {
+            adv: curSegByType.adv + pauseByType.adv,
+            sea: curSegByType.sea + pauseByType.sea,
+            att: curSegByType.att + pauseByType.att,
           };
           cac_ballsUsed = cac_ballsUsedByType.adv + cac_ballsUsedByType.sea + cac_ballsUsedByType.att;
           nextBallStartByType = { adv: bet.adv || 0, sea: bet.sea || 0, att: bet.att || 0 };
@@ -265,7 +360,8 @@ function reducer(state, action) {
         const ballStart = task.ballStart;
         const ballEnd = action.ballEnd;
         const restockTotal = (task.ballRestocks || []).reduce((s, r) => s + (r.amount || 0), 0);
-        cac_ballsUsed = (ballStart != null && ballEnd != null) ? ballStart + restockTotal - ballEnd : null;
+        const curSeg = (ballStart != null && ballEnd != null) ? ballStart + restockTotal - ballEnd : null;
+        cac_ballsUsed = curSeg != null ? curSeg + cac_pauseTotal : (cac_pauseTotal > 0 ? cac_pauseTotal : null);
         nextBallStart = ballEnd ?? null;
       }
       const completed = {
@@ -275,6 +371,7 @@ function reducer(state, action) {
         resultType: action.resultType || (action.isPool ? 'pool' : 'offpool'),
         shieldBreakCount: task.shieldBreakCount,
         breakdowns,
+        shieldBreaks: task.shieldBreaks || [],
         ballMode: task.ballMode || 'simple',
         ballsUsed: cac_ballsUsed,
         ...(cac_ballsUsedByType ? { ballsUsedByType: cac_ballsUsedByType } : {}),
@@ -303,6 +400,7 @@ function reducer(state, action) {
           ballStart: task.ballMode === 'byType' ? null : nextBallStart,
           ballStartByType: task.ballMode === 'byType' ? nextBallStartByType : null,
           ballRestocks: [],
+          pauseSegments: [],
         })),
         completedTasks: [completed, ...state.completedTasks],
       };
@@ -310,27 +408,16 @@ function reducer(state, action) {
     case 'ABANDON_TASK': {
       const task = state.activeTasks.find(t => t.planId === action.planId);
       if (!task) return state;
-      if (task.shieldBreakCount === 0) {
-        return {
-          ...state,
-          activeTasks: state.activeTasks.filter(t => t.planId !== action.planId),
-        };
-      }
-      const breakdowns = { original: 0, polluted: 0, shiny: 0 };
-      task.shieldBreaks.forEach(b => { breakdowns[b.result]++; });
-      const abandoned = {
-        id: task.id,
-        planId: task.planId,
-        resultSpirit: null,
-        resultType: 'abandoned',
-        shieldBreakCount: task.shieldBreakCount,
-        breakdowns,
-        completedAt: new Date().toISOString(),
-      };
+      // 无论破盾次数多少，一律静默删除，不写入 completedTasks
+      // 同时将 planId 写入墓碑列表，防止刷新后 mergeStates 从云端把任务复活
+      const prevAbandoned = Array.isArray(state.abandonedPlanIds) ? state.abandonedPlanIds : [];
+      const abandonedPlanIds = action.planId
+        ? [...new Set([...prevAbandoned, action.planId])]
+        : prevAbandoned;
       return {
         ...state,
         activeTasks: state.activeTasks.filter(t => t.planId !== action.planId),
-        completedTasks: [abandoned, ...state.completedTasks],
+        abandonedPlanIds,
       };
     }
     case 'UPDATE_COMPLETED_BALLS': {
@@ -346,10 +433,15 @@ function reducer(state, action) {
         ...state,
         completedTasks: state.completedTasks.map(t => {
           if (t.id !== action.taskId) return t;
+          // 分球明细：如果传入了 ballsUsedByType 则更新，否则保留原值
+          const newByType = action.ballsUsedByType !== undefined
+            ? action.ballsUsedByType
+            : t.ballsUsedByType;
           return {
             ...t,
             shieldBreakCount: action.shieldBreakCount ?? t.shieldBreakCount,
             ballsUsed: action.ballsUsed,
+            ...(newByType ? { ballsUsedByType: newByType } : { ballsUsedByType: undefined }),
             breakdowns: {
               ...t.breakdowns,
               polluted: action.polluted ?? (t.breakdowns?.polluted || 0),
@@ -521,21 +613,122 @@ function buildUserMeta(state) {
   return { yise_count, total_breaks, platform, avatar, user_name };
 }
 
+// ─── 工具：构造精简版 state（data 列，去掉 shieldBreaks 以减小体积）────────────
+function buildSlimState(state) {
+  return {
+    ...state,
+    completedTasks: (state.completedTasks || []).map(t => {
+      // eslint-disable-next-line no-unused-vars
+      const { shieldBreaks, ...rest } = t;
+      return rest;
+    }),
+  };
+}
+
+// ─── 工具：构造 active_tasks_summary 列（Supabase 可读的刷取中快照）────────────
+// 每条包含 planId + 当前保底次数 + 开始时间，供后台直接观察用户进度
+// 不含 shieldBreaks 详情（数据量大，已存在 data 列中）
+function buildActiveTasksSummary(state) {
+  return (state.activeTasks || []).map(t => ({
+    planId: t.planId,
+    breaks: t.shieldBreakCount ?? 0,
+    startTime: t.startTime ?? null,
+  }));
+}
+
+// ─── 工具：构造 completed_tasks_full 列数据（含完整 shieldBreaks）────────────
+// 只存有 shieldBreaks 记录的任务，节省空间；无 shieldBreaks 的任务不重复存储。
+function buildFullTasks(state) {
+  return (state.completedTasks || []).filter(
+    t => Array.isArray(t.shieldBreaks) && t.shieldBreaks.length > 0
+  );
+}
+
+// ─── 工具：把 completed_tasks_full 里的 shieldBreaks 回注进 completedTasks ────
+// 调用时机：hydrateFromCloud 读到数据库数据后，合并前先还原完整数据
+function injectShieldBreaks(completedTasks, fullTasks) {
+  if (!fullTasks?.length) return completedTasks || [];
+  const fullMap = new Map(fullTasks.map(t => [t.id, t.shieldBreaks]));
+  return (completedTasks || []).map(t => {
+    const breaks = fullMap.get(t.id);
+    // 若 data 列里已有 shieldBreaks（旧代码写的），优先保留；否则从 full 列回注
+    if (breaks && !t.shieldBreaks?.length) {
+      return { ...t, shieldBreaks: breaks };
+    }
+    return t;
+  });
+}
+
 // ─── 工具：合并本地 + 云端数据（取并集，永不丢失任何一条记录）────────────────
+  // ── shieldBreaks 真正合并工具 ──────────────────────────────────────────────
+  // 按 index 去重，两边都有同一 index 时本地优先（本地是当前设备最新记录）
+  // 两边独有的 break 都保留，确保一条破盾记录都不丢
+  function mergeBreaksArrays(localBreaks, cloudBreaks) {
+    if (!cloudBreaks?.length) return localBreaks || [];
+    if (!localBreaks?.length) return cloudBreaks;
+    const breakMap = new Map(cloudBreaks.map(b => [b.index, b]));
+    // 本地覆盖云端（本地最新）
+    localBreaks.forEach(b => breakMap.set(b.index, b));
+    return [...breakMap.values()].sort((a, b) => a.index - b.index);
+  }
+
 function mergeStates(local, cloud) {
   const defaults = buildDefaultState();
 
-  // completedTasks：按 id 去重，取并集，按时间降序排列
+  // completedTasks：按 id 取并集，每条记录两边都保留
+  // 合并策略：
+  //   本地基础字段优先（本地是当前设备最新编辑的来源）
+  //   云端有而本地没有的任务 → 全量补入（跨设备数据不丢）
+  //   shieldBreaks → 两边真正合并（按 index 去重，本地优先），一条破盾记录都不丢
   const taskMap = new Map();
-  [...(cloud.completedTasks || []), ...(local.completedTasks || [])].forEach(t => {
-    if (!taskMap.has(t.id)) taskMap.set(t.id, t);
+
+  // 先放本地（基础字段以本地为准）
+  (local.completedTasks || []).forEach(t => taskMap.set(t.id, t));
+
+  // 再处理云端：云端有而本地没有的补入；同 id 则合并 shieldBreaks
+  (cloud.completedTasks || []).forEach(cloudTask => {
+    if (!taskMap.has(cloudTask.id)) {
+      // 云端独有 → 直接补入
+      taskMap.set(cloudTask.id, cloudTask);
+    } else {
+      // 同 id 两边都有 → 本地基础字段保留，shieldBreaks 两边真正合并
+      const localTask = taskMap.get(cloudTask.id);
+      const mergedBreaks = mergeBreaksArrays(localTask.shieldBreaks, cloudTask.shieldBreaks);
+      taskMap.set(cloudTask.id, { ...localTask, shieldBreaks: mergedBreaks });
+    }
   });
+
   const completedTasks = [...taskMap.values()].sort(
     (a, b) => new Date(b.completedAt) - new Date(a.completedAt)
   );
 
-  // activeTasks：以本地为准（进行中的任务只在当前设备有意义）
-  const activeTasks = local.activeTasks || [];
+  // activeTasks：按 planId 取并集，进行中的任务两边都保留
+  // 本地有的 planId → 用本地（当前刷球现场，数据最新）
+  // 本地没有但云端有 → 从云端恢复（换设备继续进行中任务）
+  // 同 planId 两边都有 → 本地优先，同时合并 shieldBreaks 确保破盾记录不丢
+  // abandonedPlanIds：本地主动删除的任务墓碑，云端同 planId 的任务不再补入（防刷新复活）
+  const localAbandonedIds = new Set([
+    ...(Array.isArray(local.abandonedPlanIds) ? local.abandonedPlanIds : []),
+    ...(Array.isArray(cloud.abandonedPlanIds) ? cloud.abandonedPlanIds : []),
+  ]);
+  const localActiveMap = new Map((local.activeTasks || []).map(t => [t.planId, t]));
+  const activeTasks = (local.activeTasks || []).map(localTask => {
+    const cloudTask = (cloud.activeTasks || []).find(c => c.planId === localTask.planId);
+    if (!cloudTask) return localTask;
+    // 同 planId：本地基础字段优先，shieldBreaks 两边合并
+    return {
+      ...localTask,
+      shieldBreaks: mergeBreaksArrays(localTask.shieldBreaks, cloudTask.shieldBreaks),
+    };
+  });
+  // 云端有而本地没有的进行中任务 → 补入（已被墓碑标记的跳过，防止刷新后复活）
+  for (const cloudTask of (cloud.activeTasks || [])) {
+    if (!localActiveMap.has(cloudTask.planId) && !localAbandonedIds.has(cloudTask.planId)) {
+      activeTasks.push(cloudTask);
+    }
+  }
+  // abandonedPlanIds：两边取并集（任一设备删除的任务，所有设备都不再恢复）
+  const abandonedPlanIds = [...localAbandonedIds];
 
   // spirits：任意一边 obtained=true 则视为已获得，取最早的 obtainedAt
   const allSpiritKeys = new Set([
@@ -596,14 +789,32 @@ function mergeStates(local, cloud) {
   const cloudOwned = new Set(cloud.ownedFruits || []);
   const ownedFruits = [...new Set([...localOwned, ...cloudOwned])];
 
-  return { spirits, fruitProgress, activeTasks, completedTasks, userPlanConfig, ownedFruits };
+  return { spirits, fruitProgress, activeTasks, abandonedPlanIds, completedTasks, userPlanConfig, ownedFruits };
 }
 
 // ─── 工具：从云端拉取并水合数据（始终合并，不丢弃任何一方数据）─────────────
-async function hydrateFromCloud(uid, dispatch, localFallback) {
+// 写 lk_username 到 localStorage 并发自定义事件（同 Tab 内 useUsername hook 可以响应）
+// overwrite=true：云端有历史名字时直接覆盖本地（登录/找回场景，优先尊重用户历史昵称）
+// overwrite=false（默认）：本地已有值则跳过（新用户首次拉取，不覆盖已随机生成的名字）
+function setLocalUsername(name, overwrite = false) {
+  if (!name) return;
+  if (!overwrite && localStorage.getItem('lk_username')) return;
+  localStorage.setItem('lk_username', name);
+  window.dispatchEvent(new StorageEvent('storage', {
+    key: 'lk_username',
+    newValue: name,
+    storageArea: localStorage,
+  }));
+}
+
+// overwriteUserMeta:
+//   true  → 换设备/找回账号场景（SIGNED_IN uid 变化），云端名字/头像直接覆盖本地
+//   false → 普通启动场景（init()），本地已有名字则保留，不让云端旧值覆盖用户最近改的名
+async function hydrateFromCloud(uid, dispatch, localFallback, overwriteUserMeta = false) {
+  // 同时读取 data（精简版）和 completed_tasks_full（含 shieldBreaks 的完整版）
   const { data: row, error } = await supabase
     .from('user_data')
-    .select('data, avatar, user_name')
+    .select('data, avatar, user_name, completed_tasks_full')
     .eq('user_id', uid)
     .maybeSingle();
 
@@ -611,13 +822,25 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
 
   const localData = localFallback || getLocalState();
 
-  // 还原云端的 avatar / user_name 到 localStorage（换设备恢复用）
-  if (row?.avatar) localStorage.setItem('lk_user_avatar', row.avatar);
-  if (row?.user_name && !localStorage.getItem('lk_username')) {
-    localStorage.setItem('lk_username', row.user_name);
+  // 还原云端的 avatar / user_name 到 localStorage
+  // overwriteUserMeta=true（换设备/找回）：直接覆盖，恢复用户历史昵称
+  // overwriteUserMeta=false（普通启动）：本地已有名字就保留，尊重用户在本设备上的最新改名
+  if (row?.avatar) {
+    if (overwriteUserMeta || !localStorage.getItem('lk_user_avatar')) {
+      localStorage.setItem('lk_user_avatar', row.avatar);
+    }
   }
+  setLocalUsername(row?.user_name, overwriteUserMeta);
 
   let cloudData = row?.data;
+
+  // 把 completed_tasks_full 里的 shieldBreaks 回注进 cloudData.completedTasks
+  if (cloudData && row?.completed_tasks_full?.length) {
+    cloudData = {
+      ...cloudData,
+      completedTasks: injectShieldBreaks(cloudData.completedTasks, row.completed_tasks_full),
+    };
+  }
 
   // ── 同邮箱多账号合并 ─────────────────────────────────────────────────────
   // 同一用户可能在多个设备分别绑定/找回，产生多条 user_id 不同但 email 相同的行。
@@ -635,37 +858,53 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
     if (email) {
       const { data: relatedRows } = await supabase
         .from('user_data')
-        .select('user_id, data, avatar, user_name, pending_bind_email')
+        .select('user_id, data, completed_tasks_full, avatar, user_name, pending_bind_email')
         .or(`user_email.eq.${email},pending_bind_email.eq.${email}`)
         .neq('user_id', uid);           // 排除当前 uid 自身
 
       if (relatedRows?.length > 0) {
         let mergedCount = 0;
         for (const relRow of relatedRows) {
-          const rd = relRow?.data;
-          if (rd && (rd.spirits || rd.completedTasks)) {
+          let rd = relRow?.data;
+          // Fix: 只要 rd 存在（哪怕 spirits/completedTasks 为空对象），
+          // 或者有 completed_tasks_full，都应参与合并，不能因字段为空就跳过整行。
+          // 之前的条件 (rd.spirits || rd.completedTasks) 会在孤儿行 data 结构异常时
+          // 跳过该行，导致云端有效数据被忽略，最终被本地空数据覆盖。
+          const hasRelData = rd != null || relRow.completed_tasks_full?.length > 0;
+          if (hasRelData) {
+            rd = rd || {};
+            // 回注该行的 shieldBreaks
+            if (relRow.completed_tasks_full?.length) {
+              rd = {
+                ...rd,
+                completedTasks: injectShieldBreaks(rd.completedTasks || [], relRow.completed_tasks_full),
+              };
+            }
             // 每行数据逐一与 cloudData 取并集（mergeStates 完全幂等）
+            // 以 cloudData 为"local"（更新的主行），rd 为"cloud"（待合并的孤儿行）
             cloudData = cloudData
-              ? mergeStates(rd, cloudData)
+              ? mergeStates(cloudData, rd)
               : rd;
             mergedCount++;
-            if (!row?.avatar && relRow.avatar) {
-              localStorage.setItem('lk_user_avatar', relRow.avatar);
+            if (relRow.avatar) {
+              if (overwriteUserMeta || !localStorage.getItem('lk_user_avatar')) {
+                localStorage.setItem('lk_user_avatar', relRow.avatar);
+              }
             }
-            if (!localStorage.getItem('lk_username') && relRow.user_name) {
-              localStorage.setItem('lk_username', relRow.user_name);
-            }
+            // 关联行的昵称也遵循同一覆盖策略
+            setLocalUsername(relRow.user_name, overwriteUserMeta);
           }
-          // 有 pending 标记的行，合并后清除（避免重复合并）
-          if (relRow.pending_bind_email) {
-            supabase
-              .from('user_data')
-              .update({ pending_bind_email: null })
-              .eq('user_id', relRow.user_id)
-              .then(({ error: clearErr }) => {
-                if (clearErr) console.warn('[Supabase] 清除 pending_bind_email 失败:', clearErr.message);
-              });
-          }
+          // 合并完成后：只清 pending_bind_email（临时待合并标记），不碰 user_email。
+          // user_email 是该账号的永久邮箱标识，清掉后未来跨设备合并就找不到这行了。
+          // 匿名临时行（UID_B）的完整清理由 SIGNED_IN 事件在 OTP 登录后统一 delete 处理。
+          supabase
+            .from('user_data')
+            .update({ pending_bind_email: null })
+            .eq('user_id', relRow.user_id)
+            .then(({ error: clearErr }) => {
+              if (clearErr) console.warn('[Supabase] 清除孤儿行 pending_bind_email 失败:', clearErr.message);
+              else console.log(`[Supabase] 已清除孤儿行 ${relRow.user_id} 的 pending_bind_email`);
+            });
         }
         if (mergedCount > 0) {
           console.log(`[Supabase] 同邮箱多账号合并：共合并 ${mergedCount} 条关联数据`);
@@ -676,7 +915,10 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
     console.warn('[Supabase] 同邮箱多账号合并查询失败:', e.message);
   }
 
-  if (cloudData && (cloudData.spirits || cloudData.completedTasks)) {
+  // Fix: 只要 cloudData 不为 null 就视为云端有数据，不再要求 spirits/completedTasks 非空。
+  // 之前的条件在孤儿行合并后 cloudData 存在但字段为空对象时会走 else 分支，
+  // 把本地（可能为空）的数据上传覆盖了合并后的云端数据。
+  if (cloudData != null) {
     // 云端有数据 → 与本地合并，取并集
     if (cloudData.activeTask && !cloudData.activeTasks) {
       cloudData.activeTasks = [cloudData.activeTask];
@@ -684,14 +926,22 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
     }
     if (!cloudData.activeTasks) cloudData.activeTasks = [];
 
-    const merged = mergeStates(localData, cloudData);
+    const mergedRaw = mergeStates(localData, cloudData);
+    // 清理存量 abandoned 记录（已废弃类型，不应再出现在刷取记录里）
+    const merged = {
+      ...mergedRaw,
+      completedTasks: (mergedRaw.completedTasks || []).filter(t => t.resultType !== 'abandoned'),
+    };
     dispatch({ type: '_HYDRATE_FROM_CLOUD', data: merged });
-    // 把合并结果写到新 uid 下
+    // 把合并结果写到新 uid 下（data 列精简，completed_tasks_full 列存完整 shieldBreaks）
     try {
       const meta = buildUserMeta(merged);
       await supabase.from('user_data').upsert({
         user_id: uid,
-        data: merged,
+        device_id: DEVICE_ID,
+        data: buildSlimState(merged),
+        completed_tasks_full: buildFullTasks(merged),
+        active_tasks_summary: buildActiveTasksSummary(merged),
         updated_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
         last_active_at: new Date().toISOString(),
@@ -702,11 +952,18 @@ async function hydrateFromCloud(uid, dispatch, localFallback) {
     }
     return 'merged';
   } else {
-    // 云端无有效数据 → 上传本地数据
-    const meta = buildUserMeta(localData);
+    // 云端无有效数据 → 上传本地数据（同样过滤 abandoned）
+    const cleanLocal = {
+      ...localData,
+      completedTasks: (localData.completedTasks || []).filter(t => t.resultType !== 'abandoned'),
+    };
+    const meta = buildUserMeta(cleanLocal);
     await supabase.from('user_data').upsert({
       user_id: uid,
-      data: localData,
+      device_id: DEVICE_ID,
+      data: buildSlimState(cleanLocal),
+      completed_tasks_full: buildFullTasks(cleanLocal),
+      active_tasks_summary: buildActiveTasksSummary(localData),
       updated_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       last_active_at: new Date().toISOString(),
@@ -733,8 +990,22 @@ export function StoreProvider({ children }) {
   // 待执行的登录模式：'normal'（找回/绑定，合并本地数据）| 'switch'（切换账号，不合并）
   const pendingAuthModeRef = useRef('normal');
   // 绑定/登录成功后弹出的全局 Toast
-  // { type: 'bind' | 'login' | 'switch', email: string } | null
+  // { type: 'bind' | 'login' | 'switch' | 'offline' | 'syncError', email?: string } | null
   const [authToast, setAuthToast] = useState(null);
+  // 持久化失败重试：记录失败次数和定时器 ID
+  const syncRetryCountRef = useRef(0);
+  const syncRetryTimerRef = useRef(null);
+  // 供 visibilitychange 等外部调用：触发一次立即云端同步（读最新 state）
+  // 由持久化 effect 在条件满足时注入，条件不满足时为 null（offline / 未初始化）
+  const doSyncNowRef = useRef(null);
+  // offline 模式下的后台重连：记录重试次数、定时器 ID、当前 attemptReconnect 函数引用
+  const offlineRetryCountRef = useRef(0);
+  const offlineRetryTimerRef = useRef(null);
+  // retryOfflineNow() 调用时通过此 ref 直接触发最新的 attemptReconnect
+  const attemptReconnectRef = useRef(null);
+  // 用 ref 持有最新 authUser，供 onAuthStateChange 闭包读取最新值
+  // 避免 useEffect 依赖 authUser 导致 subscription 被反复 unsubscribe/重注册
+  const authUserRef = useRef(null);
 
   // ── 初始化：匿名登录 + 拉取云端数据 ────────────────────────────────────────
   useEffect(() => {
@@ -773,16 +1044,19 @@ export function StoreProvider({ children }) {
 
         const uid = session.user.id;
         userIdRef.current = uid;
+        authUserRef.current = session.user;
         setUserId(uid);
         setAuthUser(session.user);
 
         // 2. 从云端拉取或上传数据
-        await hydrateFromCloud(uid, dispatch, getLocalState());
+        // overwriteUserMeta=false：普通启动，本地已有昵称时不覆盖（保留用户最近改的名）
+        await hydrateFromCloud(uid, dispatch, getLocalState(), false);
         setSyncStatus('ready');
 
         // 3. 上报本次活跃时间（不管用户有没有操作，打开 App 就算活跃）
         supabase.from('user_data').upsert({
           user_id: uid,
+          device_id: DEVICE_ID,
           last_active_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }, { onConflict: 'user_id' }).then(({ error }) => {
@@ -791,6 +1065,8 @@ export function StoreProvider({ children }) {
       } catch (err) {
         console.warn('[Supabase] 初始化失败，降级为本地模式:', err.message);
         setSyncStatus('offline');
+        // 提示用户当前处于本地模式，数据暂不同步
+        setAuthToast({ type: 'offline' });
       } finally {
         if (!cancelled) {
           setInitialized(true);
@@ -803,7 +1079,10 @@ export function StoreProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Auth 状态监听：只挂载一次，处理邮件链接点击后的登录/升级事件 ──────────
+  // ── Auth 状态监听：只挂载一次（[] 依赖），用 authUserRef 读最新 authUser ──────
+  // 重要：不能把 authUser state 加入依赖——每次 authUser 变化都会导致
+  // subscription 被 unsubscribe 再重新注册，注册瞬间 SDK 可能重放当前 session
+  // 事件，造成竞态覆盖数据（尤其是 uid 判断错误导致 dispatch 空数据）。
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -814,6 +1093,7 @@ export function StoreProvider({ children }) {
         // 如果 init() 还没完成就先到这里，补设 authUser（PKCE 流下尤其重要）
         if (event === 'INITIAL_SESSION') {
           if (session?.user && !initDoneRef.current) {
+            authUserRef.current = session.user;
             setAuthUser(session.user);
             userIdRef.current = uid;
             setUserId(uid);
@@ -826,15 +1106,18 @@ export function StoreProvider({ children }) {
           // init 未完成时跳过，让 init() 的 getSession 兜底处理最终态
           if (!session || !initDoneRef.current) return;
           const newEmail = session.user.email;
+          // 先读旧值判断是否是"新绑定邮箱"，再更新 ref
+          const prevEmail = authUserRef.current?.email;
+          authUserRef.current = session.user;
           setAuthUser(session.user);
-          // 仅当 email 是新出现的（之前是匿名）才弹 Toast，并写入云端用户信息
-          if (newEmail && !authUser?.email) {
+          // prevEmail 为空说明之前是匿名账号，现在才第一次绑上邮箱
+          if (newEmail && !prevEmail) {
             setAuthToast({ type: 'bind', email: newEmail });
-            // 绑定成功：写入 user_email / user_name / avatar
             const avatar    = localStorage.getItem('lk_user_avatar') || null;
             const user_name = localStorage.getItem('lk_username')    || null;
             supabase.from('user_data').upsert({
               user_id: uid,
+              device_id: DEVICE_ID,
               user_email: newEmail,
               user_name,
               avatar,
@@ -846,22 +1129,24 @@ export function StoreProvider({ children }) {
           return;
         }
 
-        // SIGNED_IN：OTP 魔法链接登录
+        // SIGNED_IN：OTP 验证码登录
         if (event === 'SIGNED_IN') {
           if (!session) return;
           // init 未完成时跳过，避免与 init() 并发执行 hydrateFromCloud
           if (!initDoneRef.current) return;
 
-          // uid 相同 = 同设备同账号
+          // uid 相同 = 同设备同账号（匿名升级为正式账号，或重复登录）
           if (uid === prevUid) {
-            if (session.user.email && !authUser?.email) {
+            // 用 ref 读最新值，不用 React state authUser（闭包里可能是旧值）
+            if (session.user.email && !authUserRef.current?.email) {
+              authUserRef.current = session.user;
               setAuthUser(session.user);
               setAuthToast({ type: 'bind', email: session.user.email });
-              // 写入 user_email / user_name / avatar
               const avatar    = localStorage.getItem('lk_user_avatar') || null;
               const user_name = localStorage.getItem('lk_username')    || null;
               supabase.from('user_data').upsert({
                 user_id: uid,
+                device_id: DEVICE_ID,
                 user_email: session.user.email,
                 user_name,
                 avatar,
@@ -876,29 +1161,43 @@ export function StoreProvider({ children }) {
           // uid 不同 = 换设备 OTP 登录 / 邮件找回 / 切换账号
           const isSwitching = pendingAuthModeRef.current === 'switch';
           pendingAuthModeRef.current = 'normal'; // 消费后立即重置
+          // 记录 prevUid：OTP 登录成功后需要清理此匿名临时行
+          const anonUidToClean = (!isSwitching && prevUid) ? prevUid : null;
+          authUserRef.current = session.user;
           setAuthUser(session.user);
           setUserId(uid);
           userIdRef.current = uid;
           setSyncStatus('syncing');
           try {
-            // 切换账号：传空的默认 state 作为 localFallback，不把当前设备数据合并进新账号
-            // 找回账号：传当前本地数据，确保合并时不丢本地记录
+            // overwriteUserMeta=true：uid 变化 = 换设备/找回账号，云端昵称直接覆盖本地
             await hydrateFromCloud(
               uid, dispatch,
-              isSwitching ? buildDefaultState() : getLocalState()
+              isSwitching ? buildDefaultState() : getLocalState(),
+              true
             );
             setSyncStatus('ready');
             if (session.user.email) {
               setAuthToast({ type: isSwitching ? 'switch' : 'login', email: session.user.email });
-              // 更新 user_email + last_active_at（user_name/avatar 已由 hydrateFromCloud 处理）
               supabase.from('user_data').upsert({
                 user_id: uid,
+                device_id: DEVICE_ID,
                 user_email: session.user.email,
                 last_active_at: new Date().toISOString(),
                 updated_at: new Date().toISOString(),
               }, { onConflict: 'user_id' }).then(({ error }) => {
                 if (error) console.warn('[Supabase] 更新用户信息失败:', error.message);
               });
+            }
+            // OTP 登录成功后，删除匿名临时行（UID_B）。
+            // 匿名 uid 完成了"搭桥"使命，数据已合并进正式 uid，行本身不再需要。
+            // 注意：切换账号（isSwitching）时不删，因为 prevUid 是另一个正式账号。
+            if (anonUidToClean) {
+              supabase.from('user_data').delete()
+                .eq('user_id', anonUidToClean)
+                .then(({ error: delErr }) => {
+                  if (delErr) console.warn('[Supabase] 清理匿名临时行失败:', delErr.message);
+                  else console.log('[Supabase] 已删除匿名临时行:', anonUidToClean);
+                });
             }
           } catch (err) {
             console.warn('[Supabase] auth 事件同步失败:', err.message);
@@ -908,6 +1207,7 @@ export function StoreProvider({ children }) {
         }
 
         if (event === 'SIGNED_OUT') {
+          authUserRef.current = null;
           setAuthUser(null);
           setUserId(null);
           userIdRef.current = null;
@@ -917,35 +1217,174 @@ export function StoreProvider({ children }) {
     );
 
     return () => subscription.unsubscribe();
-  // authUser 加入依赖，确保闭包里读到最新值
+  // 故意只在挂载时执行一次，内部通过 ref 读取最新值，避免重复注册带来的竞态
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authUser]);
+  }, []);
 
   // ── 持久化：state 变更时同步写 localStorage + 云端 ────────────────────────
   useEffect(() => {
-    // 写 localStorage（离线缓存，始终执行）
+    // 写 localStorage（离线缓存，始终执行，保留完整 shieldBreaks 供本地读取）
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
     // 初始化完成 + 有用户 ID + 不是离线模式 → 异步写云端
-    if (!initialized || !userId || syncStatus === 'offline') return;
+    if (!initialized || !userId || syncStatus === 'offline') {
+      doSyncNowRef.current = null; // 条件不满足时清空，防止 visibilitychange 误调
+      return;
+    }
 
-    const meta = buildUserMeta(state);
-    supabase
-      .from('user_data')
-      .upsert({
-        user_id: userId,
-        data: state,
-        updated_at: new Date().toISOString(),
-        last_active_at: new Date().toISOString(),
-        // 若 authUser 已有邮箱也一并同步（冗余保险）
-        ...(authUser?.email ? { user_email: authUser.email } : {}),
-        ...meta,
-      }, { onConflict: 'user_id' })
-      .then(({ error }) => {
-        if (error) console.warn('[Supabase] 同步失败:', error.message);
-      });
+    // state 变化 = 本次有新数据需要同步 → 重置重试计数，取消上次的重试定时器
+    if (syncRetryTimerRef.current) {
+      clearTimeout(syncRetryTimerRef.current);
+      syncRetryTimerRef.current = null;
+    }
+    syncRetryCountRef.current = 0;
+
+    // 构建一次上传快照（捕获当前 state / userId / authUserRef，供重试闭包使用）
+    const snapshot = {
+      user_id: userId,
+      device_id: DEVICE_ID,
+      data: buildSlimState(state),
+      completed_tasks_full: buildFullTasks(state),
+      active_tasks_summary: buildActiveTasksSummary(state),
+      ...buildUserMeta(state),
+      ...(authUserRef.current?.email ? { user_email: authUserRef.current.email } : {}),
+    };
+
+    // 实际执行上传，失败时按指数退避调度重试（最多 3 次：30s / 60s / 120s）
+    function doUpsert() {
+      supabase
+        .from('user_data')
+        .upsert({
+          ...snapshot,
+          updated_at: new Date().toISOString(),
+          last_active_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+        .then(({ error }) => {
+          if (!error) {
+            // 成功：清除重试状态
+            syncRetryCountRef.current = 0;
+            return;
+          }
+          console.warn('[Supabase] 同步失败:', error.message);
+          const attempt = syncRetryCountRef.current;
+          if (attempt >= 3) {
+            // 已重试 3 次仍失败：给用户轻提示
+            console.warn('[Supabase] 重试耗尽，数据暂存本地');
+            setAuthToast({ type: 'syncError' });
+            return;
+          }
+          // 指数退避：30s → 60s → 120s
+          const delayMs = 30_000 * Math.pow(2, attempt);
+          console.warn(`[Supabase] 将在 ${delayMs / 1000}s 后重试（第 ${attempt + 1} 次）`);
+          syncRetryCountRef.current += 1;
+          syncRetryTimerRef.current = setTimeout(doUpsert, delayMs);
+        });
+    }
+
+    // 把 doUpsert 暴露给 visibilitychange 监听器，以便页面切后台时能主动触发
+    doSyncNowRef.current = doUpsert;
+
+    doUpsert();
+
+    // 组件卸载时清除未执行的重试定时器
+    return () => {
+      if (syncRetryTimerRef.current) {
+        clearTimeout(syncRetryTimerRef.current);
+        syncRetryTimerRef.current = null;
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, initialized, userId, syncStatus]);
+
+  // ── 保底同步：页面切到后台 / 用户关闭 Tab 时立即触发一次云端写入 ────────────
+  // 解决「用户记录完数据直接关闭页面，异步写还没发出」的数据丢失场景
+  useEffect(() => {
+    function onVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        // 读最新的 doUpsert（由持久化 effect 注入，offline 时为 null）
+        doSyncNowRef.current?.();
+        console.log('[Supabase] visibilitychange → hidden，触发保底同步');
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []); // 只挂载一次，通过 ref 读最新 doUpsert
+
+  // ── offline 后台静默重连：syncStatus 变为 'offline' 时后台不停尝试恢复同步 ───
+  // 退避策略：30s → 60s → 120s → 300s，之后每 5 分钟试一次，直到成功为止
+  // 第 3 次仍失败 → 弹 networkWarn Toast，告知用户并提供手动重试入口
+  // 成功后静默恢复（无 Toast），因为用户可能根本没意识到曾经离线
+  useEffect(() => {
+    // 不在 offline 状态：清除定时器，重置计数
+    if (syncStatus !== 'offline') {
+      if (offlineRetryTimerRef.current) {
+        clearTimeout(offlineRetryTimerRef.current);
+        offlineRetryTimerRef.current = null;
+      }
+      offlineRetryCountRef.current = 0;
+      return;
+    }
+
+    // 退避延迟表（秒）：第 0 次 30s，第 1 次 60s，第 2 次 120s，之后保持 120s
+    const DELAYS_SEC = [30, 60, 120];
+    // 第 3 次失败后弹 networkWarn Toast（30s + 60s + 120s ≈ 持续离线 ~3.5 分钟）
+    const WARN_AFTER = 3;
+
+    async function attemptReconnect() {
+      console.log(`[Supabase] offline 重连尝试 #${offlineRetryCountRef.current + 1}`);
+      try {
+        // 1. 先检查 session 是否可用（如果网络还断就会直接抛错）
+        const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+        if (sessionErr) throw sessionErr;
+        if (!session) throw new Error('no session');
+
+        const uid = session.user.id;
+
+        // 2. 重连成功后用 hydrateFromCloud 拉取云端数据并与本地合并后写回
+        // 不能直接 upsert 本地数据：本地可能是空（换设备后 offline），会覆盖云端正确数据
+        await hydrateFromCloud(uid, dispatch, getLocalState(), false);
+
+        // 3. 成功！更新 React state，持久化 effect 之后会自动正常运作
+        console.log('[Supabase] offline 重连成功，恢复同步');
+        userIdRef.current = uid;
+        authUserRef.current = session.user;
+        setUserId(uid);
+        setAuthUser(session.user);
+        setSyncStatus('ready');
+        // 静默恢复，不打扰用户
+      } catch (err) {
+        // 仍然无法连通，记录次数后调度下一次重试
+        const attempt = offlineRetryCountRef.current;
+        offlineRetryCountRef.current += 1;
+
+        // 第 WARN_AFTER 次失败时，推送 networkWarn 提示（只推一次，之后继续静默重试）
+        if (attempt + 1 === WARN_AFTER) {
+          console.warn('[Supabase] offline 重连失败 3 次，推送网络异常提示');
+          setAuthToast({ type: 'networkWarn' });
+        }
+
+        const delaySec = DELAYS_SEC[Math.min(attempt, DELAYS_SEC.length - 1)];
+        console.warn(`[Supabase] offline 重连失败（${err.message}），${delaySec}s 后再试`);
+        offlineRetryTimerRef.current = setTimeout(attemptReconnect, delaySec * 1000);
+      }
+    }
+
+    // 把 attemptReconnect 挂到 ref，供 retryOfflineNow 立即调用
+    attemptReconnectRef.current = attemptReconnect;
+
+    // 首次进入 offline：延迟 30s 后开始第一次尝试
+    offlineRetryTimerRef.current = setTimeout(attemptReconnect, DELAYS_SEC[0] * 1000);
+
+    return () => {
+      if (offlineRetryTimerRef.current) {
+        clearTimeout(offlineRetryTimerRef.current);
+        offlineRetryTimerRef.current = null;
+      }
+      attemptReconnectRef.current = null;
+    };
+  // syncStatus 变化时重新评估，其余依赖通过 ref / 闭包读取最新值
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncStatus]);
 
   // ── 强制立即同步（绑定邮箱前调用，确保云端有数据）─────────────────────────
   // email: 用户即将绑定/登录的邮箱，同时写入 user_email + pending_bind_email
@@ -969,7 +1408,11 @@ export function StoreProvider({ children }) {
       .from('user_data')
       .upsert({
         user_id: uid,
-        data: currentState,
+        device_id: DEVICE_ID,
+        // data 列：精简版，forceSyncNow 也同步去掉 shieldBreaks
+        data: buildSlimState(currentState),
+        completed_tasks_full: buildFullTasks(currentState),
+        active_tasks_summary: buildActiveTasksSummary(currentState),
         updated_at: new Date().toISOString(),
         last_active_at: new Date().toISOString(),
         // 写入目标邮箱：user_email 和 pending_bind_email 双保险
@@ -987,8 +1430,20 @@ export function StoreProvider({ children }) {
   // 'switch'：切换账号，仅加载目标账号云端数据，不合并当前设备数据
   const setAuthMode = (mode) => { pendingAuthModeRef.current = mode; };
 
+  // ── 立即重试 offline 重连（networkWarn Toast 的「重试连接」按钮调用）──────────
+  // 清零计数器、取消当前定时器、立即发起一次重连尝试
+  const retryOfflineNow = () => {
+    if (syncStatus !== 'offline') return;
+    offlineRetryCountRef.current = 0;
+    if (offlineRetryTimerRef.current) {
+      clearTimeout(offlineRetryTimerRef.current);
+      offlineRetryTimerRef.current = null;
+    }
+    attemptReconnectRef.current?.();
+  };
+
   return (
-    <StoreContext.Provider value={{ state, dispatch, syncStatus, userId, authUser, authToast, clearAuthToast: () => setAuthToast(null), forceSyncNow, setAuthMode }}>
+    <StoreContext.Provider value={{ state, dispatch, syncStatus, userId, authUser, authToast, clearAuthToast: () => setAuthToast(null), forceSyncNow, setAuthMode, retryOfflineNow }}>
       {children}
     </StoreContext.Provider>
   );

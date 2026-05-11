@@ -269,7 +269,7 @@ export default function Home({ navigate }) {
               </div>
             </div>
             {/* 浅色体：透明背景展示纸纹 */}
-            <div style={{ padding: '12px 14px 14px' }}>
+            <div style={{ padding: '12px 14px 22px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 600 }}>触发污染保底进度</span>
                 <span style={{ fontSize: 14, fontWeight: 900, color: 'var(--cta)' }}>

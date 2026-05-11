@@ -1,16 +1,15 @@
 /**
- * Service Worker — 图片缓存
+ * Service Worker — 图片缓存 + 自动更新通知
  *
- * 策略：Cache First（缓存优先）
+ * 图片缓存策略：Cache First（缓存优先）
  *   1. 命中缓存 → 直接返回，无网络请求
  *   2. 未命中   → 发起网络请求，成功后写入缓存
  *
- * 覆盖范围：所有 .png / .jpg / .webp / .gif 图片请求
- *   - 本地 /spirits/、/fruits/ 等静态图
- *   - BWIKI CDN 跨域图（patchwiki.biligame.com）
+ * 自动更新：新版本 SW 激活后，向所有页面广播 SW_UPDATED，
+ *   页面收到消息后自动 reload，用户无需手动刷新。
  */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const IMG_CACHE = `luoke-images-${CACHE_VERSION}`;
 
 // ── 安装：立即激活，不等待旧 SW 关闭 ────────────────────────────────────────
@@ -18,7 +17,7 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-// ── 激活：删除旧版本缓存，接管所有页面 ──────────────────────────────────────
+// ── 激活：清旧缓存 → 接管页面 → 广播"有新版本" ──────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
@@ -28,6 +27,8 @@ self.addEventListener('activate', (event) => {
           .map(k => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => clients.forEach(client => client.postMessage({ type: 'SW_UPDATED' })))
   );
 });
 

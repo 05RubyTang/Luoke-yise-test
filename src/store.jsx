@@ -1312,7 +1312,7 @@ export function StoreProvider({ children }) {
 
   // ── offline 后台静默重连：syncStatus 变为 'offline' 时后台不停尝试恢复同步 ───
   // 退避策略：30s → 60s → 120s → 300s，之后每 5 分钟试一次，直到成功为止
-  // 第 3 次仍失败 → 弹 networkWarn Toast，告知用户并提供手动重试入口
+  // 第 2 次仍失败 → 弹 networkWarn Toast，告知用户并提供手动重试入口
   // 成功后静默恢复（无 Toast），因为用户可能根本没意识到曾经离线
   useEffect(() => {
     // 不在 offline 状态：清除定时器，重置计数
@@ -1325,10 +1325,10 @@ export function StoreProvider({ children }) {
       return;
     }
 
-    // 退避延迟表（秒）：第 0 次 30s，第 1 次 60s，第 2 次 120s，之后保持 120s
-    const DELAYS_SEC = [30, 60, 120];
-    // 第 3 次失败后弹 networkWarn Toast（30s + 60s + 120s ≈ 持续离线 ~3.5 分钟）
-    const WARN_AFTER = 3;
+    // 退避延迟表（秒）：第 0 次 30s，第 1 次 60s，之后保持 60s
+    const DELAYS_SEC = [30, 60];
+    // 第 2 次失败后弹 networkWarn Toast（30s + 60s ≈ 持续离线 ~1.5 分钟）
+    const WARN_AFTER = 2;
 
     async function attemptReconnect() {
       console.log(`[Supabase] offline 重连尝试 #${offlineRetryCountRef.current + 1}`);
@@ -1359,7 +1359,7 @@ export function StoreProvider({ children }) {
 
         // 第 WARN_AFTER 次失败时，推送 networkWarn 提示（只推一次，之后继续静默重试）
         if (attempt + 1 === WARN_AFTER) {
-          console.warn('[Supabase] offline 重连失败 3 次，推送网络异常提示');
+          console.warn('[Supabase] offline 重连失败 2 次，推送网络异常提示');
           setAuthToast({ type: 'networkWarn' });
         }
 

@@ -1632,9 +1632,6 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
               );
             };
 
-            // 计算总条目数，作为收起态的概览提示
-            const totalRows = familyEntries.length + attrEntries.length + (worldPool > 0 ? 1 : 0);
-
             return (
               <div
                 className="card animate-in"
@@ -1661,11 +1658,6 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                     style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }}
                   />
                   <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span><span style={{ fontSize: 11, fontWeight: 400, color: '#888', marginLeft: 4 }}>（测试版）</span>
-                  {!poolOverviewExpanded && (
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 2 }}>
-                      {`共 ${totalRows} 条进度`}
-                    </span>
-                  )}
                   <img
                     src={`${import.meta.env.BASE_URL}next-icon.webp`}
                     alt=""

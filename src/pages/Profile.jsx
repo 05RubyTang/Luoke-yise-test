@@ -1650,7 +1650,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                     aria-hidden="true"
                     style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span><span style={{ fontSize: 11, fontWeight: 400, color: '#888', marginLeft: 4 }}>（测试版）</span>
                   {!poolOverviewExpanded && (
                     <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 2 }}>
                       {`共 ${totalRows} 条进度`}

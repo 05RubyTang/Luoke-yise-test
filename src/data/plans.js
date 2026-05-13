@@ -563,6 +563,45 @@ export const PLANS = [
     // 萌系池可产出：属性含萌系的异色精灵
     poolShinies: ['大耳帽兜', '治愈兔'],
   },
+
+  // ─── 跨属世界池方案（双果实属性不同，进度全部计入世界池） ──────────────────────
+  // 世界池保底机制：80次触发，与属性池/家族池独立计数
+  // 这类方案没有系别池，三池仪表盘只显示世界池进度
+  {
+    id: 'world_demonwolf_moonbear',
+    type: '恶魔狼+月牙雪熊',
+    icon: '🌍',
+    iconImg: `${base}icon-mixpool.png`,
+    color: '#7E57C2',
+    fruitA: '恶魔狼果实',      // 恶系（evil）
+    fruitB: '月牙雪熊果实',    // 冰系（ice）
+    spiritA: '恶魔狼',
+    spiritB: '月牙雪熊',
+    shinies: ['恶魔狼', '月牙雪熊'],   // 两只均有异色
+    unlockA: '抓/进化20只恶魔狼（恶系果实）',
+    unlockB: '第六章赛季任务，捕捉2只污染血脉的月牙雪熊可获得',
+    worldPlan: true,  // 显式标记为世界池方案（fruitA/fruitB 跨属，classifyPool 自动判世界池）
+    highValue: true,  // 双目标同刷，兼顾恶系+冰系两只赛季稀有精灵
+    poolShinies: ['恶魔狼', '月牙雪熊'],  // 世界池可出的目标异色
+  },
+  {
+    id: 'world_fairpigeon_chrysanthemumpear',
+    type: '公平鸽+菊花梨',
+    icon: '🌍',
+    iconImg: `${base}icon-mixpool.png`,
+    color: '#7E57C2',
+    fruitA: '公平鸽果实',      // 普通系（normal）
+    fruitB: '菊花梨果实',      // 萌系（cute）
+    spiritA: '公平鸽',
+    spiritB: '菊花梨',
+    shinies: [],               // 两者均无异色，纯积累世界池
+    unlockA: '抓/进化20只公平鸽',
+    unlockB: '抓/进化20只菊花梨',
+    noShiny: true,
+    worldPlan: true,           // 显式标记为世界池方案
+    // 世界池可产出所有世界池异色精灵（每次触发随机，以下为常见目标）
+    poolShinies: ['恶魔狼', '月牙雪熊', '嗜光嗡嗡', '空空颅', '贝瑟', '双灯鱼'],
+  },
   {
     id: 'light_miniunicorn',
     type: '小独角兽',

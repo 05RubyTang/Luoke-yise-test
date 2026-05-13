@@ -889,6 +889,14 @@ function AvatarUploader({ avatarUrl, onFileChange }) {
 
 const CHANGELOG = [
   {
+    version: 'v2.7',
+    date: '2026-05-14',
+    tags: ['新方案'],
+    items: [
+      '方案库新增两个跨属世界池混刷方案：「恶魔狼+月牙雪熊」（恶系×冰系）、「公平鸽+菊花梨」（普通系×萌系），支持在世界池稳定积累多属系权重',
+    ],
+  },
+  {
     version: 'v2.6',
     date: '2026-05-13',
     tags: ['数据', '修复', '优化'],

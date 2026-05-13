@@ -1047,8 +1047,21 @@ export function getPlanAttrId(plan) {
  */
 export function classifyResultType(resultSpirit, plan) {
   if (!resultSpirit || !plan) return 'world';
-  const targetFamilies = [plan.spiritA, plan.spiritB].filter(Boolean);
-  if (targetFamilies.some(t => fuzzyMatch(t, resultSpirit))) return 'family';
+
+  // ── 步骤1：判断方案类型（单刷 / 同属混刷 / 跨属混刷）────────────────────────
+  // 与 classifyPool 保持一致：只有单刷方案才有家族池语义
+  // 同属混刷（fruitA ≠ fruitB 但属性相同）：spiritA/B 出货归属系池，不是家族池
+  // 跨属混刷（attrA ≠ attrB）：spiritA/B 出货归世界池
+  const isSingleFruit = !plan.fruitB || plan.fruitA === plan.fruitB;
+
+  if (isSingleFruit) {
+    // ── 单刷：spiritA/B 出货 → 家族池 ──────────────────────────────────────
+    const targetFamilies = [plan.spiritA, plan.spiritB].filter(Boolean);
+    if (targetFamilies.some(t => fuzzyMatch(t, resultSpirit))) return 'family';
+  }
+  // 同属混刷 / 跨属混刷：spiritA/B 出货不算家族池，继续走属系池/世界池判断
+
+  // ── 步骤2：属系池匹配 ────────────────────────────────────────────────────
   const planAttrId = getPlanAttrId(plan);
   if (planAttrId) {
     const spiritAttr1 = lookupAttr(resultSpirit);
@@ -1056,6 +1069,8 @@ export function classifyResultType(resultSpirit, plan) {
     // 出货精灵的任意一个属性与方案属性匹配，即判为属性池出货
     if (spiritAttr1 === planAttrId || spiritAttr2 === planAttrId) return 'attr';
   }
+
+  // ── 步骤3：兜底世界池 ─────────────────────────────────────────────────────
   return 'world';
 }
 
@@ -1139,13 +1154,15 @@ export function classifyPool(spiritName, plan) {
  */
 export function inferPoolType(task, plan) {
   if (!task) return 'world';
-  // 'family' / 'attr' 已是明确的新格式值，直接信任存储
-  if (task.resultType === 'family' || task.resultType === 'attr') return task.resultType;
-  // 'world' 需要重新推断：旧数据可能因双属性判断缺失而被错误存成 world
-  // 其他旧格式（'pool' 等）也走推断
+  // 优先从 resultSpirit + plan 重新推断：
+  //   - 覆盖旧数据中同属混刷方案错误存成 'family' 的情况
+  //   - 覆盖旧数据中缺少双属性判断而错存成 'world' 的情况
+  //   - 单刷方案重推结果不变，无副作用
   if (task.resultSpirit && plan) {
     return classifyResultType(task.resultSpirit, plan);
   }
+  // 无精灵名时降级信任存储值，旧格式 'pool' 兜底为 family
+  if (task.resultType === 'family' || task.resultType === 'attr') return task.resultType;
   return task.resultType === 'pool' ? 'family' : 'world';
 }
 

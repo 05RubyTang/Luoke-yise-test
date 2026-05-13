@@ -2071,10 +2071,10 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
             onClick={e => e.stopPropagation()}
             style={{
               background: '#fff', borderRadius: 20,
-              padding: '24px 28px 20px',
+              padding: '24px 20px 20px',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
               boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-              maxWidth: 280, width: '80%',
+              maxWidth: 340, width: '90%',
               position: 'relative',
             }}
           >
@@ -2089,13 +2089,10 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
             <div style={{ fontSize: 16, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>
               加入用户反馈 &amp; 解答群
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
-              扫码加入用户反馈2群（小红书）
-            </div>
             <img
               src={`${import.meta.env.BASE_URL}qrcode-feedback.webp`}
               alt="答疑群二维码"
-              style={{ width: 180, height: 180, borderRadius: 12, objectFit: 'cover' }}
+              style={{ width: '100%', borderRadius: 12, objectFit: 'contain' }}
             />
             <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 500, textAlign: 'center', lineHeight: 1.6 }}>
               有问题欢迎在群里反馈，<br />我看到会第一时间回复～

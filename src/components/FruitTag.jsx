@@ -54,20 +54,26 @@ function buildSrcChain(name) {
   const trimmed = (name || '').trim();
   if (!trimmed) return [{ kind: 'svg' }];
 
-  // 1. 本地 fruits 目录原名
-  chain.push({ kind: 'img', src: `${base}fruits/${encodeURIComponent(trimmed)}.png?v=3` });
+  // 辅助：同时推入 .webp 和 .png 两个候选，webp 优先（体积小、GitHub Pages 支持）
+  function pushLocal(dir, filename) {
+    const enc = encodeURIComponent(filename);
+    chain.push({ kind: 'img', src: `${base}${dir}/${enc}.webp?v=3` });
+    chain.push({ kind: 'img', src: `${base}${dir}/${enc}.png?v=3` });
+  }
 
-  // 1.5 若传入的是精灵名（不含「果实」后缀），自动补全「果实」再尝试一次本地图
-  //     例：「月牙雪熊」→ 尝试 fruits/月牙雪熊果实.png，避免不必要的 404
+  // 1. 本地 fruits 目录原名（webp 优先）
+  pushLocal('fruits', trimmed);
+
+  // 1.5 若传入的是精灵名（不含「果实」后缀），自动补全「果实」再试本地图
+  //     例：「恶魔狼」→ 尝试 fruits/恶魔狼果实.webp / .png
   if (!trimmed.endsWith('果实')) {
-    const withSuffix = `${trimmed}果实`;
-    chain.push({ kind: 'img', src: `${base}fruits/${encodeURIComponent(withSuffix)}.png?v=3` });
+    pushLocal('fruits', `${trimmed}果实`);
   }
 
   // 2. 反查同义果实名（用户输入精灵名 / 进化名时）
   const alias = getFruitBySpirit(trimmed.endsWith('果实') ? trimmed.slice(0, -2) : trimmed);
   if (alias && alias !== trimmed) {
-    chain.push({ kind: 'img', src: `${base}fruits/${encodeURIComponent(alias)}.png?v=3` });
+    pushLocal('fruits', alias);
   }
 
   // 3. wiki CDN 原名（同时尝试自动补全「果实」后缀的 wiki 查询）
@@ -91,7 +97,7 @@ function buildSrcChain(name) {
   // 5. 本地 spirits 目录（用户输入了完全自定义的精灵名）
   const spiritName = trimmed.endsWith('果实') ? trimmed.slice(0, -2) : trimmed;
   if (spiritName) {
-    chain.push({ kind: 'img', src: `${base}spirits/${encodeURIComponent(spiritName)}.png?v=3` });
+    pushLocal('spirits', spiritName);
   }
 
   // 6. 兜底 SVG 首字头像

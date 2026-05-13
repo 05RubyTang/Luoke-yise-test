@@ -345,9 +345,103 @@ function SeasonPlanCard({ plan, spirits, completedTasks, activeTasks, onClick, s
   );
 }
 
+/* ─── 跨属世界池方案卡 ────────────────────────────────────────────────────────── */
+function WorldPlanCard({ plan, spirits, completedTasks, activeTasks, onClick, fruitReady }) {
+  const status = getSeasonPlanStatus(plan, spirits, activeTasks);
+  const avgInfo = calcPlanAvgBreaks(plan.id, completedTasks);
+  // noShiny 世界池方案展示 poolShinies；有异色的展示 shinies
+  const displayShinies = plan.noShiny ? (plan.poolShinies || []) : (plan.shinies || []);
+  const obtainedCount  = (plan.shinies || []).filter(n => spirits[n]?.obtained).length;
+  const allObtained    = plan.shinies?.length > 0 && obtainedCount === plan.shinies.length;
+
+  const headerBg = status === 'active' ? '#C8830A' : allObtained ? '#4B9C46' : '#5B3A9E';
+
+  return (
+    <div
+      className="plan-card"
+      onClick={onClick}
+      style={{
+        borderColor: status === 'active' ? '#C8830A' : allObtained ? '#4B9C46' : '#7E57C2',
+        boxShadow: status === 'active' ? '0 2px 0 #C8830A' : allObtained ? '0 2px 0 #4B9C46' : '0 2px 0 #5B3A9E',
+        padding: 0, overflow: 'hidden', background: '#FBF7EC', cursor: 'pointer',
+        marginBottom: 8,
+      }}
+    >
+      {/* 表头 */}
+      <div style={{ background: headerBg, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <PlanIcon plan={plan} size={28} style={{ flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 900, fontFamily: 'var(--font-display)', color: '#FBF7EC', letterSpacing: 0.5, lineHeight: 1.2 }}>
+            {plan.type}
+          </div>
+          <div style={{ fontSize: 10, color: 'rgba(251,247,236,0.65)', marginTop: 2 }}>
+            跨属混刷 · 世界池积累
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <div style={{ textAlign: 'right' }}>
+            {status === 'active' && (
+              <div style={{ fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 20, background: 'rgba(251,247,236,0.25)', color: '#FBF7EC', border: '1px solid rgba(251,247,236,0.4)', marginBottom: 4, display: 'inline-block' }}>刷取中</div>
+            )}
+            {plan.noShiny ? (
+              <div style={{ fontSize: 9, color: 'rgba(251,247,236,0.6)', fontStyle: 'italic' }}>无专属异色</div>
+            ) : (
+              <div style={{ lineHeight: 1 }}>
+                <span className="font-subtitle" style={{ fontSize: 16, fontWeight: 900, color: '#FBF7EC' }}>{obtainedCount}</span>
+                <span style={{ fontSize: 10, fontWeight: 400, color: 'rgba(251,247,236,0.7)', marginLeft: 1 }}>/{plan.shinies.length}</span>
+              </div>
+            )}
+            {allObtained && <div style={{ fontSize: 9, color: '#FBF7EC', fontWeight: 700, marginTop: 2 }}>✓ 全收集</div>}
+          </div>
+          <span style={{ fontSize: 16, color: 'rgba(251,247,236,0.7)' }}>›</span>
+        </div>
+      </div>
+
+      {/* 内容区 */}
+      <div style={{ padding: '10px 14px 12px' }}>
+        {/* 果实行 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--text-light)' }}>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginRight: 4 }}>果实：</span>
+            <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
+          </div>
+          {!fruitReady && <FruitMissingBadge />}
+          {fruitReady && (avgInfo
+            ? <span style={{ fontSize: 9, color: '#8B5C00', fontWeight: 700, flexShrink: 0 }}>均 <span className="font-subtitle" style={{ fontSize: 11 }}>{avgInfo.avg}</span> 次破盾</span>
+            : <span style={{ fontSize: 9, color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0 }}>暂无记录</span>
+          )}
+        </div>
+        {/* 精灵头像 */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          {plan.noShiny ? (
+            displayShinies.slice(0, 5).map(name => (
+              <SpiritAvatar key={name} name={name} obtained={spirits[name]?.obtained} size={36} />
+            ))
+          ) : (
+            (plan.shinies || []).map(name => (
+              <SpiritAvatar key={name} name={name} obtained={spirits[name]?.obtained} size={36} />
+            ))
+          )}
+          {plan.noShiny && (
+            <span style={{ fontSize: 9, color: 'var(--text-muted)', alignSelf: 'center', marginLeft: 2 }}>等世界池精灵</span>
+          )}
+          <span style={{
+            marginLeft: 'auto', fontSize: 11,
+            color: status === 'active' ? 'var(--cta)' : 'var(--text-muted)',
+            fontWeight: status === 'active' ? 700 : 600,
+          }}>
+            {status === 'active' ? '继续刷取 →' : '点击开始 →'}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── 筛选项（与 picker 分类保持一致） ──────────────────────────────────────── */
 const FILTERS = [
   { key: 'all',    label: '全部' },
+  { key: 'world',  label: '世界池混刷' },
   { key: 'attr',   label: '属性混抓' },
   { key: 'season', label: '单刷奇遇' },
   { key: 'single', label: '单刷异色' },
@@ -395,14 +489,21 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   const activeFilterCount = (fruitFilter !== 'all' ? 1 : 0) + (attrFilter !== 'all' ? 1 : 0);
 
   // noShiny 且有 attrId 的方案归属父属系二级页，不在主列表独立展示
-  const attrPlans        = PLANS.filter(p => !p.season && !p.singleSpirit && !(p.noShiny && p.attrId));
-  const seasonPlans      = PLANS.filter(p => p.season);
+  // worldPlan：跨属世界池方案，单独区块展示
+  const worldPlansList    = PLANS.filter(p => p.worldPlan);
+  const attrPlans         = PLANS.filter(p => !p.season && !p.singleSpirit && !(p.noShiny && p.attrId) && !p.worldPlan);
+  const seasonPlans       = PLANS.filter(p => p.season);
   const singleSpiritPlans = PLANS.filter(p => p.singleSpirit);
 
   // 已拥有果实
   const ownedFruits = state.ownedFruits || [];
 
   // 计算每类方案的状态 + 果实是否集齐
+  const worldWithStatus = worldPlansList.map(p => ({
+    plan: p,
+    status: getSeasonPlanStatus(p, state.spirits, state.activeTasks),
+    fruitReady: isFruitReady(p, ownedFruits),
+  }));
   const attrWithStatus = attrPlans.map(p => ({
     plan: p,
     status: getPlanStatus(p, state.spirits, state.activeTasks),
@@ -419,9 +520,9 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
     fruitReady: isFruitReady(p, ownedFruits),
   }));
 
-  const allWithStatus = [...attrWithStatus, ...seasonWithStatus, ...singleWithStatus];
+  const allWithStatus = [...worldWithStatus, ...attrWithStatus, ...seasonWithStatus, ...singleWithStatus];
 
-  // 顶部总览统计（含单刷异色）
+  // 顶部总览统计（含世界池混刷 + 单刷异色）
   const activeCount = allWithStatus.filter(x => x.status === 'active').length;
   const doneCount   = allWithStatus.filter(x => x.status === 'done').length;
   const idleCount   = allWithStatus.filter(x => x.status === 'idle').length;
@@ -439,13 +540,14 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
     if (status === 'idle' && !fruitReady) return 2;
     return 3; // done
   };
-  // 二维筛选：果实收录 + 属系
-  const applyFilters = (arr) => arr.filter(x => {
+  // 二维筛选：果实收录 + 属系（世界池方案无属系归属，attrFilter 时跳过）
+  const applyFilters = (arr, skipAttrFilter = false) => arr.filter(x => {
     if (fruitFilter === 'ready'   && !x.fruitReady) return false;
     if (fruitFilter === 'missing' &&  x.fruitReady) return false;
-    if (attrFilter !== 'all' && getPlanAttr(x.plan) !== attrFilter) return false;
+    if (!skipAttrFilter && attrFilter !== 'all' && getPlanAttr(x.plan) !== attrFilter) return false;
     return true;
   });
+  const sortedWorld  = applyFilters([...worldWithStatus].sort((a, b) => sortKey(a) - sortKey(b)), true);
   const sortedAttr   = applyFilters([...attrWithStatus].sort((a, b) => sortKey(a) - sortKey(b)));
   const sortedSeason = applyFilters([...seasonWithStatus].sort((a, b) => sortKey(a) - sortKey(b)));
   const sortedSingle = applyFilters([...singleWithStatus].sort((a, b) => sortKey(a) - sortKey(b)));
@@ -455,6 +557,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   const filteredUserPlans  = applyFilters(userPlansWithFruit).map(x => x.plan);
 
   // library 模式分类显示控制
+  const showWorld     = filter === 'all' || filter === 'world';
   const showAttr      = filter === 'all' || filter === 'attr';
   const showSeason    = filter === 'all' || filter === 'season';
   const showSingle    = filter === 'all' || filter === 'single';
@@ -464,12 +567,14 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   if (mode === 'picker') {
     const PICKER_TABS = [
       { key: 'all',     label: '全部' },
+      { key: 'world',   label: '世界池混刷' },
       { key: 'attr',    label: '属性混抓' },
       { key: 'season',  label: '单刷奇遇' },
       { key: 'single',  label: '单刷异色' },
       { key: 'custom',  label: '自定义方案' },
     ];
 
+    const showWorldP = pickerTab === 'all' || pickerTab === 'world';
     const showAttr   = pickerTab === 'all' || pickerTab === 'attr';
     const showSeason = pickerTab === 'all' || pickerTab === 'season';
     const showSingle = pickerTab === 'all' || pickerTab === 'single';
@@ -503,6 +608,12 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
               background: isActive ? 'var(--text)' : 'var(--card)',
               color: isActive ? 'var(--bg)' : 'var(--text-muted)',
             };
+            const isWorldTab  = t.key === 'world';
+            const worldStyle = isWorldTab && isActive
+              ? { background: '#5B3A9E', border: '2px solid #5B3A9E', color: '#fff' }
+              : isWorldTab
+              ? { background: 'rgba(91,58,158,0.08)', border: '1.5px solid rgba(91,58,158,0.35)', color: '#7E57C2' }
+              : {};
             const customStyle = isCustomTab && isActive
               ? { background: '#7E57C2', border: '2px solid #7E57C2', color: '#fff' }
               : isCustomTab
@@ -510,18 +621,40 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
               : {};
             return (
               <button key={t.key} onClick={() => setPickerTab(t.key)}
-                style={{ ...baseStyle, ...customStyle }}>
+                style={{ ...baseStyle, ...worldStyle, ...customStyle }}>
                 {t.label}
               </button>
             );
           })}
         </div>
 
-        {/* ── 属性混抓 ── */}
+        {/* ── 世界池混刷（picker） ── */}
+        {showWorldP && (
+          <>
+            {pickerTab === 'all' && (
+              <div style={{ padding: '0 16px 7px', fontSize: 12, fontWeight: 800, color: '#7E57C2' }}>🌍 世界池混刷</div>
+            )}
+            <div style={{ padding: '0 16px' }}>
+              {worldPlansList.map(plan => (
+                <WorldPlanCard
+                  key={plan.id}
+                  plan={plan}
+                  spirits={state.spirits}
+                  completedTasks={state.completedTasks}
+                  activeTasks={state.activeTasks}
+                  fruitReady={isFruitReady(plan, ownedFruits)}
+                  onClick={() => navigate('checklist', { planId: plan.id })}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ── 属性混抓（picker） ── */}
         {showAttr && (
           <>
             {pickerTab === 'all' && (
-              <div style={{ padding: '0 16px 7px', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>属性混抓</div>
+              <div style={{ padding: `${showWorldP ? '8px' : '0'} 16px 7px`, fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>属性混抓</div>
             )}
             {attrPlans.map(plan => (
               plan.noShiny ? (
@@ -550,11 +683,11 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
           </>
         )}
 
-        {/* ── 单刷奇遇（赛季） ── */}
+        {/* ── 单刷奇遇（赛季）picker ── */}
         {showSeason && (
           <>
             {pickerTab === 'all' && (
-              <div style={{ padding: showAttr ? '8px 16px 7px' : '0 16px 7px', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>单刷奇遇</div>
+              <div style={{ padding: `${(showWorldP || showAttr) ? '8px' : '0'} 16px 7px`, fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>单刷奇遇</div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 8px', padding: '0 16px' }}>
               {seasonPlans.map(plan => (
@@ -568,11 +701,11 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
           </>
         )}
 
-        {/* ── 单刷异色（普通异色单刷） ── */}
+        {/* ── 单刷异色（picker） ── */}
         {showSingle && (
           <>
             {pickerTab === 'all' && (
-              <div style={{ padding: (showAttr || showSeason) ? '8px 16px 7px' : '0 16px 7px', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>单刷异色</div>
+              <div style={{ padding: `${(showWorldP || showAttr || showSeason) ? '8px' : '0'} 16px 7px`, fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>单刷异色</div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 8px', padding: '0 16px' }}>
               {singleSpiritPlans.map(plan => (
@@ -586,11 +719,11 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
           </>
         )}
 
-        {/* ── 自定义方案 ── */}
+        {/* ── 自定义方案（picker） ── */}
         {showCustom && (
           <>
             {pickerTab === 'all' && (
-              <div style={{ padding: (showAttr || showSeason || showSingle) ? '8px 16px 7px' : '0 16px 7px', fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>自定义方案</div>
+              <div style={{ padding: `${(showWorldP || showAttr || showSeason || showSingle) ? '8px' : '0'} 16px 7px`, fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>自定义方案</div>
             )}
             {/* 已有的自定义方案列表 */}
             {userPlans.length > 0 && (
@@ -747,11 +880,18 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
           const isCustom = f.key === 'custom';
           // 各分类计数（受果实筛选影响）
           const count = f.key === 'all'
-            ? sortedAttr.length + sortedSeason.length + sortedSingle.length + filteredUserPlans.length
+            ? sortedWorld.length + sortedAttr.length + sortedSeason.length + sortedSingle.length + filteredUserPlans.length
+            : f.key === 'world'  ? sortedWorld.length
             : f.key === 'attr'   ? sortedAttr.length
             : f.key === 'season' ? sortedSeason.length
             : f.key === 'single' ? sortedSingle.length
             : filteredUserPlans.length; // custom
+          const isWorld  = f.key === 'world';
+          const worldActiveStyle = isWorld && active
+            ? { background: '#5B3A9E', border: '2px solid #5B3A9E', color: '#fff' }
+            : isWorld && !active
+            ? { background: 'rgba(91,58,158,0.08)', border: '1.5px solid rgba(91,58,158,0.35)', color: '#7E57C2' }
+            : {};
           const customActiveStyle = isCustom && active
             ? { background: '#7E57C2', border: '2px solid #7E57C2', color: '#fff' }
             : isCustom && !active
@@ -766,6 +906,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
               color: active ? 'var(--bg)' : 'var(--text-muted)',
               fontSize: 12, fontWeight: active ? 800 : 600,
               fontFamily: 'var(--font-body)', cursor: 'pointer', transition: 'all 0.15s',
+              ...worldActiveStyle,
               ...customActiveStyle,
             }}>
               {f.label}
@@ -833,7 +974,30 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
         </button>
       </div>
 
-      {/* ── 自定义方案区块（全部模式下置顶） ── */}
+      {/* ── 世界池混刷方案列表 ── */}
+      {showWorld && sortedWorld.length > 0 && (
+        <>
+          <div style={{ padding: '0 16px 7px', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, fontWeight: 800, color: '#7E57C2' }}>🌍 世界池混刷</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>{sortedWorld.length} 个</span>
+          </div>
+          <div style={{ padding: '0 16px' }}>
+            {sortedWorld.map(({ plan, fruitReady }) => (
+              <WorldPlanCard
+                key={plan.id}
+                plan={plan}
+                spirits={state.spirits}
+                completedTasks={state.completedTasks}
+                activeTasks={state.activeTasks}
+                fruitReady={fruitReady}
+                onClick={() => navigate('checklist', { planId: plan.id })}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ── 自定义方案区块（全部模式下紧跟世界池后） ── */}
       {showCustomLib && (
         <>
           <div style={{ padding: '0 16px 7px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -941,7 +1105,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
       {/* ── 属性混抓方案列表 ── */}
       {showAttr && sortedAttr.length > 0 && (
         <>
-          <div style={{ padding: `${showCustomLib ? '10px' : '0'} 16px 7px`, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ padding: `${(showWorld || showCustomLib) ? '10px' : '0'} 16px 7px`, display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>属性混抓</span>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>{sortedAttr.length} 个</span>
           </div>
@@ -1005,7 +1169,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
       )}
 
       {/* ── 全部筛选后无结果提示 ── */}
-      {sortedAttr.length === 0 && sortedSeason.length === 0 && sortedSingle.length === 0 && filteredUserPlans.length === 0 && activeFilterCount > 0 && (
+      {sortedWorld.length === 0 && sortedAttr.length === 0 && sortedSeason.length === 0 && sortedSingle.length === 0 && filteredUserPlans.length === 0 && activeFilterCount > 0 && (
         <div style={{ textAlign: 'center', padding: '32px 24px', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 28, marginBottom: 8 }}>🔍</div>
           <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 4 }}>没有符合条件的方案</div>

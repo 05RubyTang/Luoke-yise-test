@@ -1574,12 +1574,21 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
             const activeTasks = state.activeTasks || [];
             const allPlans = [...PLANS, ...(state.userPlanConfig || [])];
 
+            // attrId → 中文属性名（用于系别池标签，与方案/精灵名无关）
+            const ATTR_LABEL = {
+              fire: '火', ice: '冰', electric: '电', phantom: '幻',
+              grass: '草', evil: '恶', ghost: '幽', mech: '机械',
+              light: '光', light_fluffy: '光', water: '水',
+              cute: '萌', dragon: '龙', wing: '翼', poison: '毒',
+              fighting: '武', bug: '虫', normal: '普通',
+            };
+
             // 系别池：遍历所有有非零进度的 attrId
             const attrEntries = Object.entries(attrPools)
               .filter(([, v]) => v > 0)
               .map(([attrId, count]) => {
-                // 用 attrId 在所有方案里找对应方案的显示信息
-                const plan = allPlans.find(p => getPlanAttrId(p) === attrId || p.id === attrId);
+                // 用 attrId 在所有方案里找对应属系方案的图标/颜色信息
+                const plan = allPlans.find(p => p.id === attrId);
                 return { attrId, count, plan };
               });
 
@@ -1685,12 +1694,12 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       />
                     ))}
 
-                    {/* 系别池（按 attrId 分条） */}
+                    {/* 系别池（按 attrId 分条，标签始终用「x系池」） */}
                     {attrEntries.map(({ attrId, count, plan }) => (
                       <PoolRow
                         key={attrId}
                         icon={plan?.iconImg || null}
-                        label={`${plan?.type || attrId} 系别`}
+                        label={`${ATTR_LABEL[attrId] || attrId}系池`}
                         color={plan?.color || '#E8A020'}
                         count={count}
                         limit={POOL_LIMIT.attr}

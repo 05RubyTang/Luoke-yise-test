@@ -889,6 +889,16 @@ function AvatarUploader({ avatarUrl, onFileChange }) {
 
 const CHANGELOG = [
   {
+    version: 'v2.6',
+    date: '2026-05-13',
+    tags: ['数据', '修复', '优化'],
+    items: [
+      '果实解锁攻略新增「公平鸽果实」，并支持自由手动添加果实',
+      '优化图片素材的存储形式，加载速度提升',
+      '新增「各池保底进度实时情况」模块，该功能仍在持续完善中，欢迎持续反馈',
+    ],
+  },
+  {
     version: 'v2.5',
     date: '2026-05-10',
     tags: ['修正', '优化', '数据'],
@@ -1769,7 +1779,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       padding: '9px 0', borderBottom: '1px solid var(--divider)',
                     }}>
                       <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>版本</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v2.4</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v2.6</span>
                     </div>
                     <div
                       style={{

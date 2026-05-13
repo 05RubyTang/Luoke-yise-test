@@ -992,6 +992,15 @@ export default function Recorder({ planId, navigate }) {
         const worldPool = poolCounts?.worldPool || 0;
         const attrPoolCount = attrId ? ((poolCounts?.attrPools || {})[attrId] || 0) : 0;
 
+        // attrId → 中文属性名（系别池标签固定用「x系池」，与方案/精灵名无关）
+        const ATTR_LABEL = {
+          fire: '火', ice: '冰', electric: '电', phantom: '幻',
+          grass: '草', evil: '恶', ghost: '幽', mech: '机械',
+          light: '光', light_fluffy: '光', water: '水',
+          cute: '萌', dragon: '龙', wing: '翼', poison: '毒',
+          fighting: '武', bug: '虫', normal: '普通',
+        };
+
         const FAMILY_LIMIT = 80;
         const ATTR_LIMIT = 80;
         const WORLD_LIMIT = 80;
@@ -1048,7 +1057,7 @@ export default function Recorder({ planId, navigate }) {
               {attrId && (
                 <MiniPoolRow
                   dotColor={plan.color || '#E8A020'}
-                  label={`${plan.type || '系别'}池`}
+                  label={`${ATTR_LABEL[attrId] || attrId}系池`}
                   count={attrPoolCount}
                   limit={ATTR_LIMIT}
                 />

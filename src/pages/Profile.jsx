@@ -489,15 +489,15 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
             <span style={{ fontSize: 11, color: '#A09080', fontWeight: 500 }}>
               {formatDateTime(task.completedAt)}
             </span>
-            {(task.season || 'S1') && (
+            {task.season === 'S2' && (
               <span style={{
                 fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 8,
-                background: (task.season || 'S1') === 'S2' ? 'rgba(232,115,58,0.15)' : 'rgba(139,115,85,0.12)',
-                color: (task.season || 'S1') === 'S2' ? '#E8733A' : '#8B7355',
-                border: `1px solid ${(task.season || 'S1') === 'S2' ? 'rgba(232,115,58,0.3)' : 'rgba(139,115,85,0.25)'}`,
+                background: 'rgba(232,115,58,0.15)',
+                color: '#E8733A',
+                border: '1px solid rgba(232,115,58,0.3)',
                 lineHeight: 1.5, flexShrink: 0,
               }}>
-                {SEASONS[task.season || 'S1']?.name || '暗夜时光'}
+                {SEASONS['S2']?.name || '狂欢怪谈'}
               </span>
             )}
           </div>
@@ -911,6 +911,15 @@ const CHANGELOG = [
       '新增战令异色标记功能：雪怪、爆焰喷喷可在「图鉴」页手动标记收录，无需方案',
       '新增赛季切换器：方案库支持 S1 / S2 赛季独立查看，历史 S1 方案保留完整',
       '多赛季数据兼容：旧账号数据自动迁移，S1 刷取记录保留赛季标记，不影响 S2 进度统计',
+    ],
+  },
+  {
+    version: 'v2.8',
+    date: '2026-05-16',
+    tags: ['优化', '修复'],
+    items: [
+      '云同步优化：修复重试上传时可能覆盖新数据的问题',
+      '「新建自定义方案」入口收拢至「我的 → 自定义方案」，并支持自定义方案最多 6 个果实槽位配置',
     ],
   },
   {
@@ -1636,9 +1645,8 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
               })
               .filter(e => e.count > 0);
 
-            // 完全没有任何进度时不展示
+            // 是否有任何非零进度
             const hasAny = worldPool > 0 || attrEntries.length > 0 || familyEntries.length > 0;
-            if (!hasAny) return null;
 
             const POOL_LIMIT = { family: 70, attr: 80, world: 80 };
 
@@ -1676,6 +1684,9 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
               );
             };
 
+            // 计算总条目数，作为收起态的概览提示（世界池固定 +1）
+            const totalRows = familyEntries.length + attrEntries.length + 1;
+
             return (
               <div
                 className="card animate-in"
@@ -1701,7 +1712,12 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                     aria-hidden="true"
                     style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }}
                   />
-                  <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span><span style={{ fontSize: 11, fontWeight: 400, color: '#888', marginLeft: 4 }}>（测试版）</span>
+                  <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span>
+                  {!poolOverviewExpanded && (
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 2 }}>
+                      {hasAny ? `共 ${totalRows} 条进度` : '暂无进度，点击查看说明'}
+                    </span>
+                  )}
                   <img
                     src={`${import.meta.env.BASE_URL}next-icon.webp`}
                     alt=""
@@ -1741,16 +1757,26 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       />
                     ))}
 
-                    {/* 世界池（全局单一） */}
-                    {worldPool > 0 && (
-                      <PoolRow
-                        icon={null}
-                        label="世界池"
-                        color="#7E57C2"
-                        dotColor="#7E57C2"
-                        count={worldPool}
-                        limit={POOL_LIMIT.world}
-                      />
+                    {/* 世界池（全局单一，始终显示） */}
+                    <PoolRow
+                      icon={null}
+                      label="世界池"
+                      color="#7E57C2"
+                      dotColor="#7E57C2"
+                      count={worldPool}
+                      limit={POOL_LIMIT.world}
+                    />
+
+                    {/* 无数据时的提示 */}
+                    {!hasAny && (
+                      <div style={{
+                        fontSize: 10, color: 'var(--text-muted)', fontWeight: 500,
+                        marginTop: 8, marginBottom: 2, lineHeight: 1.7,
+                        textAlign: 'center',
+                        padding: '4px 0 2px',
+                      }}>
+                        开始记录刷取后，各池进度将在这里实时同步 ✨
+                      </div>
                     )}
 
                     {/* 底部说明 */}
@@ -1815,7 +1841,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       padding: '9px 0', borderBottom: '1px solid var(--divider)',
                     }}>
                       <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>版本</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v2.6</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.0</span>
                     </div>
                     <div
                       style={{
@@ -2169,10 +2195,10 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
             onClick={e => e.stopPropagation()}
             style={{
               background: '#fff', borderRadius: 20,
-              padding: '24px 20px 20px',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              padding: '20px 20px 18px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
               boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-              maxWidth: 340, width: '90%',
+              maxWidth: 340, width: '92%',
               position: 'relative',
             }}
           >
@@ -2192,8 +2218,9 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
               alt="答疑群二维码"
               style={{ width: '100%', borderRadius: 12, objectFit: 'contain' }}
             />
-            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 500, textAlign: 'center', lineHeight: 1.6 }}>
-              有问题欢迎在群里反馈，<br />我看到会第一时间回复～
+            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 500, textAlign: 'center', lineHeight: 1.7 }}>
+              QQ 群号：<span style={{ fontWeight: 700, color: '#2B2A2E' }}>1103295482</span>，小红书群见图中二维码<br />
+              有问题欢迎在群里反馈，我看到会第一时间回复～
             </div>
           </div>
         </div>

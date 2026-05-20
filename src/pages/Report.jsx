@@ -71,8 +71,8 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
   // task 为 null 时才真正 return null（plan 现在永不为 null）
   if (!task) return null;
 
-  const breakdowns = { original: 0, polluted: 0, shiny: 0 };
-  task.shieldBreaks.forEach(b => { breakdowns[b.result]++; });
+  const breakdowns = { original: 0, polluted: 0, shiny: 0, shiny_blood: 0, mixed_blood: 0 };
+  task.shieldBreaks.forEach(b => { if (b.result in breakdowns) breakdowns[b.result]++; });
   const rating = getStarRating(task.shieldBreakCount);
 
   const ballMode = task.ballMode || 'simple';
@@ -257,16 +257,22 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
                 {plan.type}
               </Row>
 
-              <Row label="触发污染次数">
+              <Row label="奇遇次数">
                 <span className="font-subtitle" style={{ color: 'var(--cta)', fontWeight: 900, fontSize: 16 }}>
                   {task.shieldBreakCount}
                 </span>
                 <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: 11 }}>/80</span>
               </Row>
 
-              <Row label="触发污染分布">
+              <Row label="奇遇分布">
                 <span style={{ color: 'var(--success)', fontSize: 11 }}>绿×{breakdowns.original}</span>
                 <span style={{ color: 'var(--polluted)', fontSize: 11 }}>紫×{breakdowns.polluted}</span>
+                {breakdowns.shiny_blood > 0 && (
+                  <span style={{ color: '#9B59B6', fontSize: 11 }}>奇×{breakdowns.shiny_blood}</span>
+                )}
+                {breakdowns.mixed_blood > 0 && (
+                  <span style={{ color: '#5B6DF6', fontSize: 11 }}>混×{breakdowns.mixed_blood}</span>
+                )}
                 <span style={{ color: 'var(--gold)', fontSize: 11 }}>✨×{breakdowns.shiny}</span>
               </Row>
 

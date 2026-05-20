@@ -168,11 +168,12 @@ function reducer(state, action) {
       const isJelly = action.result === 'jelly';
 
       // ── 三池归属判定 ─────────────────────────────────────────────────────────
-      // 破盾后不论出现原色/污染/异色精灵，都算触发一次噩梦，均计入对应池保底进度。
+      // 破盾后不论出现原色/污染/奇异血脉/混血血脉，都算触发一次奇遇，均计入对应池保底进度。
       // 只有「触发失败（逃跑/战败）」和 shiny（已出货）不计入池保底。
       // jelly（果冻/星辰虫）固定归世界池，不占保底序号（shieldBreakCount 不自增）。
+      const POOL_CLASSIFIABLE = ['polluted', 'original', 'shiny_blood', 'mixed_blood'];
       let breakPool = null;
-      if ((action.result === 'polluted' || action.result === 'original') && action.spiritName) {
+      if (POOL_CLASSIFIABLE.includes(action.result) && action.spiritName) {
         // 同时查内置方案（S1+S2）和用户自定义方案（自定义方案 id 形如 user_plan_xxx）
         const plan = PLANS.find(p => p.id === action.planId)
           || (state.userPlanConfig || []).find(p => p.id === action.planId);
@@ -323,8 +324,8 @@ function reducer(state, action) {
     case 'COMPLETE_TASK': {
       const task = state.activeTasks.find(t => t.planId === action.planId);
       if (!task) return state;
-      const breakdowns = { original: 0, polluted: 0, shiny: 0 };
-      task.shieldBreaks.forEach(b => { breakdowns[b.result]++; });
+      const breakdowns = { original: 0, polluted: 0, shiny: 0, shiny_blood: 0, mixed_blood: 0 };
+      task.shieldBreaks.forEach(b => { if (b.result in breakdowns) breakdowns[b.result]++; });
       // 计算咕噜球消耗（兼容 simple / byType）
       let ballsUsed = null;
       let ballsUsedByType = null;
@@ -400,8 +401,8 @@ function reducer(state, action) {
     case 'COMPLETE_AND_CONTINUE': {
       const task = state.activeTasks.find(t => t.planId === action.planId);
       if (!task) return state;
-      const breakdowns = { original: 0, polluted: 0, shiny: 0 };
-      task.shieldBreaks.forEach(b => { breakdowns[b.result]++; });
+      const breakdowns = { original: 0, polluted: 0, shiny: 0, shiny_blood: 0, mixed_blood: 0 };
+      task.shieldBreaks.forEach(b => { if (b.result in breakdowns) breakdowns[b.result]++; });
       // 计算咕噜球消耗（兼容 simple / byType）
       let cac_ballsUsed = null;
       let cac_ballsUsedByType = null;
@@ -488,7 +489,7 @@ function reducer(state, action) {
       const nextShieldBreaks = resetBreaks
         ? []
         : task.shieldBreaks.filter(b => !b.pool || b.pool !== poolToClear);
-      // shieldBreakCount 从剩余 breaks 重新计算（jelly 不占保底序号）
+      // shieldBreakCount 从剩余 breaks 重新计算（jelly/failed 不占保底序号）
       const nextShieldBreakCount = nextShieldBreaks.filter(b => b.result !== 'jelly').length;
       return {
         ...state,

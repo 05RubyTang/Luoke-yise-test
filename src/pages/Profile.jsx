@@ -8,8 +8,9 @@ const getModalRoot = () => document.getElementById('modal-root') || document.bod
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
 import ShieldDots from '../components/ShieldDots';
-import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL } from '../data/plans';
+import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL, computePoolCounts } from '../data/plans';
 import { SEASONS } from '../data/seasons';
+import { S2_PLANS } from '../data/seasons/s2Plans';
 
 // 模块加载时计算一次，每次 Vite 重新构建值变化 → 强制浏览器放弃旧缓存
 const _HERO_CARD_V = Date.now();
@@ -85,12 +86,15 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   const poolType = isSuccess && !isManual ? inferPoolType(task, plan) : null;
   const poolCfg  = poolType ? (POOL_TYPE_CONFIG[poolType] || POOL_TYPE_CONFIG.world) : null;
   const breakdowns = task.breakdowns || {};
-  const polluted = breakdowns.polluted || 0;
-  const original = breakdowns.original || 0;
-  const shiny    = breakdowns.shiny    || 0;
+  const polluted   = breakdowns.polluted    || 0;
+  const original   = breakdowns.original    || 0;
+  const shiny      = breakdowns.shiny       || 0;
+  const shinyBlood = breakdowns.shiny_blood || 0;
+  const mixedBlood = breakdowns.mixed_blood || 0;
   const hasShieldBreaks = task.shieldBreaks && task.shieldBreaks.length > 0;
 
   // ── 三池进度快照（从 shieldBreaks 的 pool 字段聚合，旧数据可能无 pool 字段）──
+  const POOL_RESULT_TYPES = ['polluted', 'original', 'jelly', 'shiny_blood', 'mixed_blood'];
   const poolSnapshot = (() => {
     if (!hasShieldBreaks) return null;
     let family = 0, attr = 0, world = 0, unknown = 0;
@@ -98,7 +102,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
       if (b.pool === 'family') family++;
       else if (b.pool === 'attr') attr++;
       else if (b.pool === 'world') world++;
-      else if (b.result === 'polluted' || b.result === 'original' || b.result === 'jelly') unknown++;
+      else if (POOL_RESULT_TYPES.includes(b.result)) unknown++;
     }
     // 全无 pool 字段（纯旧数据）则不展示快照，避免全显示 0 误导用户
     if (family === 0 && attr === 0 && world === 0 && unknown > 0) return null;
@@ -371,10 +375,10 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
           <div style={{ margin: '0 16px 12px', borderRadius: 18, overflow: 'hidden', position: 'relative' }}>
             <div style={{ padding: '0 16px 14px' }}>
               <div style={{ marginBottom: 10 }}>
-                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>本次刷取各污染分布</span>
-                <div style={{ fontSize: 10, color: '#9B8F84', fontWeight: 500, marginTop: 2 }}>
-                  本次刷取期间各池实际触发污染次数
-                </div>
+                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>本次刷取各池奇遇分布</span>
+                  <div style={{ fontSize: 10, color: '#9B8F84', fontWeight: 500, marginTop: 2 }}>
+                    本次刷取期间各池实际奇遇次数
+                  </div>
               </div>
               <div style={{ height: 1, background: '#D3CFC8', marginBottom: 14 }} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around' }}>
@@ -420,7 +424,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
           </div>
         )}
 
-        {/* 触发污染记录卡 */}
+        {/* 奇遇记录卡 */}
         {hasShieldBreaks && (
           <div style={{
             margin: '0 16px 12px',
@@ -430,10 +434,12 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
           }}>
             <div style={{ padding: '0 16px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>触发污染记录</span>
-                <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700 }}>
+                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>奇遇记录</span>
+                <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <span style={{ color: 'var(--success)' }}>原色×{original}</span>
                   <span style={{ color: 'var(--polluted)' }}>污染×{polluted}</span>
+                  {shinyBlood > 0 && <span style={{ color: '#9B59B6' }}>奇异×{shinyBlood}</span>}
+                  {mixedBlood > 0 && <span style={{ color: '#5B6DF6' }}>混血×{mixedBlood}</span>}
                   {shiny > 0 && <span style={{ color: 'var(--gold)' }}>异色×{shiny}</span>}
                 </div>
               </div>
@@ -670,8 +676,8 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
             overflow: 'hidden', marginBottom: task.ballsUsedByType && showBallDetail ? 0 : 8,
           }}>
             {[
-              { label: '触发污染次数', value: task.shieldBreakCount ?? '—', color: '#D4560A' },
-              { label: '污染精灵', value: polluted, color: '#8B4BB8' },
+              { label: '奇遇次数', value: task.shieldBreakCount ?? '—', color: '#D4560A' },
+              { label: '污染血脉', value: polluted, color: '#8B4BB8' },
               { label: '原色精灵', value: original, color: '#4B9C46' },
             ].map((item, i) => (
               <div key={i} style={{
@@ -745,8 +751,8 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
             {(isManual ? [
               { field: 'ballsUsed', label: '消耗球数', placeholder: '个', color: '#2B2A2E' },
             ] : [
-              { field: 'shieldBreakCount', label: '触发污染次数', placeholder: '次数', color: '#D4560A' },
-              { field: 'polluted', label: '污染精灵', placeholder: '只', color: '#8B4BB8' },
+              { field: 'shieldBreakCount', label: '奇遇次数', placeholder: '次数', color: '#D4560A' },
+              { field: 'polluted', label: '污染血脉', placeholder: '只', color: '#8B4BB8' },
               { field: 'original', label: '原色精灵', placeholder: '只', color: '#4B9C46' },
               { field: 'ballsUsed', label: '消耗球数（总）', placeholder: '三格都填时自动算', color: '#2B2A2E' },
             ]).map(({ field, label, placeholder, color }) => (
@@ -1681,60 +1687,35 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
 
           {/* ━━ 4. 三池保底总览 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           {(() => {
-            // 从事件流派生三池计数（不再直接读 state.attrPools / state.worldPool）
-            const attrPools = poolCounts?.attrPools || {};
-            const worldPool = poolCounts?.worldPool || 0;
+            // 所有方案（含 S1 内置 + S2 + 自定义）
+            const allPlans = [...PLANS, ...S2_PLANS, ...(state.userPlanConfig || [])];
             const activeTasks = state.activeTasks || [];
-            const allPlans = [...PLANS, ...(state.userPlanConfig || [])];
 
-            // 系别池：遍历所有有非零进度的 attrId
-            const attrEntries = Object.entries(attrPools)
-              .filter(([, v]) => v > 0)
-              .map(([attrId, count]) => {
-                // 用 attrId 在所有方案里找对应方案的显示信息
-                const plan = allPlans.find(p => getPlanAttrId(p) === attrId || p.id === attrId);
-                return { attrId, count, plan };
-              });
-
-            // 家族池：从进行中任务的 shieldBreaks 事件流派生（不读 task.familyPool）
-            const familyEntries = activeTasks
-              .map(t => {
-                const plan = allPlans.find(p => p.id === t.planId) || null;
-                const count = plan ? computeFamilyPool(t, plan) : 0;
-                return { task: t, plan, count };
-              })
-              .filter(e => e.count > 0);
-
-            // 是否有任何非零进度
-            const hasAny = worldPool > 0 || attrEntries.length > 0 || familyEntries.length > 0;
+            // 分别计算 S1 / S2 两个赛季的池子进度
+            const s1Counts = computePoolCounts(activeTasks, state.completedTasks, allPlans, 'S1');
+            const s2Counts = computePoolCounts(activeTasks, state.completedTasks, allPlans, 'S2');
 
             const POOL_LIMIT = { family: 70, attr: 80, world: 80 };
 
-            // 单条进度行
+            // ── 单条进度行 ──────────────────────────────────────────────────────
             const PoolRow = ({ icon, label, color, count, limit, dotColor }) => {
               const pct = Math.min(count / limit, 1);
               const isAlmostFull = pct >= 0.85;
               return (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: '1px solid rgba(103,93,83,0.08)' }}>
-                  {/* 图标/圆点 */}
                   {icon
                     ? <img src={icon} alt="" style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0, borderRadius: 4 }} />
                     : <span style={{ width: 8, height: 8, borderRadius: '50%', background: dotColor || color, flexShrink: 0, display: 'inline-block', marginLeft: 5 }} />
                   }
-                  {/* 标签 */}
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0, minWidth: 72 }}>{label}</span>
-                  {/* 进度条 */}
                   <div style={{ flex: 1, height: 6, borderRadius: 3, background: 'rgba(103,93,83,0.12)', overflow: 'hidden' }}>
                     <div style={{
                       height: '100%', borderRadius: 3,
                       width: `${pct * 100}%`,
-                      background: isAlmostFull
-                        ? `linear-gradient(90deg, ${color}, #C8351A)`
-                        : color,
+                      background: isAlmostFull ? `linear-gradient(90deg, ${color}, #C8351A)` : color,
                       transition: 'width 0.5s cubic-bezier(.4,0,.2,1)',
                     }} />
                   </div>
-                  {/* 数字 */}
                   <span style={{
                     fontSize: 12, fontWeight: 900, fontFamily: 'var(--font-display)',
                     color: isAlmostFull ? '#C8351A' : color,
@@ -1744,8 +1725,94 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
               );
             };
 
-            // 计算总条目数，作为收起态的概览提示（世界池固定 +1）
-            const totalRows = familyEntries.length + attrEntries.length + 1;
+            // ── 构建单个赛季的展示条目 ───────────────────────────────────────────
+            const buildSeasonSection = (seasonKey, counts, accentColor, accentBg) => {
+              const attrEntries = Object.entries(counts.attrPools || {})
+                .filter(([, v]) => v > 0)
+                .map(([attrId, count]) => {
+                  const plan = allPlans.find(p => getPlanAttrId(p) === attrId || p.id === attrId);
+                  return { attrId, count, plan };
+                });
+
+              const familyEntries = activeTasks
+                .filter(t => (t.season || 'S1') === seasonKey)
+                .map(t => {
+                  const plan = allPlans.find(p => p.id === t.planId) || null;
+                  const count = plan ? computeFamilyPool(t, plan) : 0;
+                  return { task: t, plan, count };
+                })
+                .filter(e => e.count > 0);
+
+              const worldPool = counts.worldPool || 0;
+              const hasAny = worldPool > 0 || attrEntries.length > 0 || familyEntries.length > 0;
+
+              return (
+                <div key={seasonKey} style={{ marginBottom: 4 }}>
+                  {/* 赛季小标题 */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    margin: '8px 0 2px',
+                  }}>
+                    <span style={{
+                      fontSize: 9, fontWeight: 800,
+                      padding: '1px 6px', borderRadius: 8,
+                      background: accentBg,
+                      color: accentColor,
+                      border: `1px solid ${accentColor}55`,
+                      letterSpacing: 0.3,
+                    }}>{seasonKey}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {seasonKey === 'S2' ? '狂欢怪谈' : '暗夜拾光'}
+                    </span>
+                    {!hasAny && (
+                      <span style={{ fontSize: 9, color: 'var(--text-light)', fontWeight: 500, marginLeft: 4 }}>暂无进度</span>
+                    )}
+                  </div>
+
+                  {hasAny ? (
+                    <>
+                      {familyEntries.map(({ task, plan, count }) => (
+                        <PoolRow
+                          key={task.id}
+                          icon={plan?.iconImg || null}
+                          label={`${plan?.type || task.planId} 家族`}
+                          color="#C8830A"
+                          count={count}
+                          limit={POOL_LIMIT.family}
+                        />
+                      ))}
+                      {attrEntries.map(({ attrId, count, plan }) => (
+                        <PoolRow
+                          key={attrId}
+                          icon={plan?.iconImg || null}
+                          label={`${ATTR_LABEL[attrId] || attrId} 系别`}
+                          color={plan?.color || '#E8A020'}
+                          count={count}
+                          limit={POOL_LIMIT.attr}
+                        />
+                      ))}
+                      <PoolRow
+                        icon={null}
+                        label="世界池"
+                        color="#7E57C2"
+                        dotColor="#7E57C2"
+                        count={worldPool}
+                        limit={POOL_LIMIT.world}
+                      />
+                    </>
+                  ) : (
+                    <div style={{ height: 2 }} />
+                  )}
+                </div>
+              );
+            };
+
+            const hasAnyGlobal = (s1Counts.worldPool > 0 || Object.values(s1Counts.attrPools || {}).some(v => v > 0))
+              || (s2Counts.worldPool > 0 || Object.values(s2Counts.attrPools || {}).some(v => v > 0))
+              || activeTasks.length > 0;
+            const totalRows = (Object.values(s1Counts.attrPools || {}).filter(v => v > 0).length + 1)
+              + (Object.values(s2Counts.attrPools || {}).filter(v => v > 0).length + 1)
+              + activeTasks.length;
 
             return (
               <div
@@ -1775,7 +1842,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                   <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span>
                   {!poolOverviewExpanded && (
                     <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 2 }}>
-                      {hasAny ? `共 ${totalRows} 条进度` : '暂无进度，点击查看说明'}
+                      {hasAnyGlobal ? `S1 · S2 分开统计` : '暂无进度，点击查看说明'}
                     </span>
                   )}
                   <img
@@ -1793,42 +1860,17 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
 
                 {poolOverviewExpanded && (
                   <>
-                    {/* 家族池（每个进行中任务一条，count 从 shieldBreaks 派生） */}
-                    {familyEntries.map(({ task, plan, count }) => (
-                      <PoolRow
-                        key={task.id}
-                        icon={plan?.iconImg || null}
-                        label={`${plan?.type || task.planId} 家族`}
-                        color="#C8830A"
-                        count={count}
-                        limit={POOL_LIMIT.family}
-                      />
-                    ))}
+                    {/* S2 赛季进度（放前面，当前赛季优先） */}
+                    {buildSeasonSection('S2', s2Counts, '#C0562A', 'rgba(232,115,58,0.12)')}
 
-                    {/* 系别池（按 attrId 分条） */}
-                    {attrEntries.map(({ attrId, count, plan }) => (
-                      <PoolRow
-                        key={attrId}
-                        icon={plan?.iconImg || null}
-                        label={`${ATTR_LABEL[attrId] || attrId} 系别`}
-                        color={plan?.color || '#E8A020'}
-                        count={count}
-                        limit={POOL_LIMIT.attr}
-                      />
-                    ))}
+                    {/* 分隔线 */}
+                    <div style={{ height: 1, background: 'rgba(103,93,83,0.1)', margin: '4px 0' }} />
 
-                    {/* 世界池（全局单一，始终显示） */}
-                    <PoolRow
-                      icon={null}
-                      label="世界池"
-                      color="#7E57C2"
-                      dotColor="#7E57C2"
-                      count={worldPool}
-                      limit={POOL_LIMIT.world}
-                    />
+                    {/* S1 赛季进度 */}
+                    {buildSeasonSection('S1', s1Counts, '#4A80D0', 'rgba(91,156,246,0.12)')}
 
                     {/* 无数据时的提示 */}
-                    {!hasAny && (
+                    {!hasAnyGlobal && (
                       <div style={{
                         fontSize: 10, color: 'var(--text-muted)', fontWeight: 500,
                         marginTop: 8, marginBottom: 2, lineHeight: 1.7,
@@ -1841,7 +1883,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
 
                     {/* 底部说明 */}
                     <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 500, marginTop: 6, marginBottom: 2, lineHeight: 1.5 }}>
-                      · 家族池绑定当前任务，出货后重置 · 系别池 / 世界池跨任务累计，最近一次同池出货后自动清零
+                      · 家族池绑定当前任务，出货后重置 · 系别池 / 世界池跨任务累计，最近一次同池出货后自动清零 · S1/S2 进度分开统计互不影响
                     </div>
                   </>
                 )}

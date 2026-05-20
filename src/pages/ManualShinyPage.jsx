@@ -328,14 +328,14 @@ export default function ManualShinyPage({ goBack }) {
               boxShadow: 'var(--shadow-card)',
               padding: '14px', marginBottom: 12,
             }}>
-              <SectionLabel>触发污染数据 <span style={{ fontWeight: 500 }}>（选填）</span></SectionLabel>
+              <SectionLabel>奇遇数据 <span style={{ fontWeight: 500 }}>（选填）</span></SectionLabel>
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#D4560A', marginBottom: 6 }}>触发污染总次数</div>
-                <NumInput value={shieldBreakCount} onChange={setShieldBreakCount} placeholder="输入触发次数（0~80）" color="#D4560A" />
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#D4560A', marginBottom: 6 }}>奇遇总次数</div>
+                <NumInput value={shieldBreakCount} onChange={setShieldBreakCount} placeholder="输入奇遇次数（0~80）" color="#D4560A" />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#8B4BB8', marginBottom: 6 }}>污染精灵次数</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#8B4BB8', marginBottom: 6 }}>污染血脉次数</div>
                   <NumInput value={polluted} onChange={setPolluted} placeholder="紫色结果" color="#8B4BB8" />
                 </div>
                 <div>

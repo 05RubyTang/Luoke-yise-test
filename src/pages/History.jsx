@@ -78,12 +78,15 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   const poolType = isSuccess && !isManual ? inferPoolType(task, plan) : null;
   const poolCfg  = poolType ? (POOL_TYPE_CONFIG[poolType] || POOL_TYPE_CONFIG.world) : null;
   const breakdowns = task.breakdowns || {};
-  const polluted = breakdowns.polluted || 0;
-  const original = breakdowns.original || 0;
-  const shiny    = breakdowns.shiny    || 0;
+  const polluted   = breakdowns.polluted    || 0;
+  const original   = breakdowns.original    || 0;
+  const shiny      = breakdowns.shiny       || 0;
+  const shinyBlood = breakdowns.shiny_blood || 0;
+  const mixedBlood = breakdowns.mixed_blood || 0;
   const hasShieldBreaks = task.shieldBreaks && task.shieldBreaks.length > 0;
 
   // ── 三池进度快照（从 shieldBreaks 的 pool 字段聚合，旧数据可能无 pool 字段）──
+  const POOL_RESULT_TYPES = ['polluted', 'original', 'jelly', 'shiny_blood', 'mixed_blood'];
   const poolSnapshot = (() => {
     if (!hasShieldBreaks) return null;
     let family = 0, attr = 0, world = 0, unknown = 0;
@@ -91,7 +94,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
       if (b.pool === 'family') family++;
       else if (b.pool === 'attr') attr++;
       else if (b.pool === 'world') world++;
-      else if (b.result === 'polluted' || b.result === 'original' || b.result === 'jelly') unknown++;
+      else if (POOL_RESULT_TYPES.includes(b.result)) unknown++;
     }
     // 全无 pool 字段（纯旧数据）则不展示快照，避免全显示 0 误导用户
     if (family === 0 && attr === 0 && world === 0 && unknown > 0) return null;
@@ -286,9 +289,9 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
           <div style={{ margin: '0 16px 12px', borderRadius: 18, overflow: 'hidden', position: 'relative' }}>
             <div style={{ padding: '0 16px 14px' }}>
               <div style={{ marginBottom: 10 }}>
-                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>本次刷取各污染分布</span>
+                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>本次刷取各池奇遇分布</span>
                 <div style={{ fontSize: 10, color: '#9B8F84', fontWeight: 500, marginTop: 2 }}>
-                  本次刷取期间各池实际触发污染次数
+                  本次刷取期间各池实际奇遇次数
                 </div>
               </div>
               <div style={{ height: 1, background: '#D3CFC8', marginBottom: 14 }} />
@@ -336,15 +339,17 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
           </div>
         )}
 
-        {/* 触发污染记录卡 */}
+        {/* 奇遇记录卡 */}
         {hasShieldBreaks && (
           <div style={{ margin: '0 16px 12px', borderRadius: 18, overflow: 'hidden', position: 'relative' }}>
             <div style={{ padding: '0 16px 14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>触发污染记录</span>
-                <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700 }}>
+                <span className="font-subtitle" style={{ fontSize: 14, fontWeight: 800, color: '#675D53', letterSpacing: 0.8 }}>奇遇记录</span>
+                <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <span style={{ color: 'var(--success)' }}>原色×{original}</span>
                   <span style={{ color: 'var(--polluted)' }}>污染×{polluted}</span>
+                  {shinyBlood > 0 && <span style={{ color: '#9B59B6' }}>奇异×{shinyBlood}</span>}
+                  {mixedBlood > 0 && <span style={{ color: '#5B6DF6' }}>混血×{mixedBlood}</span>}
                   {shiny > 0 && <span style={{ color: 'var(--gold)' }}>异色×{shiny}</span>}
                 </div>
               </div>
@@ -561,8 +566,8 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
           overflow: 'hidden', marginBottom: task.ballsUsedByType && showBallDetail ? 0 : 8,
         }}>
           {[
-            { label: '触发污染次数', value: task.shieldBreakCount, color: '#D4560A' },
-            { label: '污染精灵', value: polluted, color: '#8B4BB8' },
+            { label: '奇遇次数', value: task.shieldBreakCount, color: '#D4560A' },
+            { label: '污染血脉', value: polluted, color: '#8B4BB8' },
             { label: '原色精灵', value: original, color: '#4B9C46' },
           ].map((item, i) => (
             <div key={i} style={{
@@ -633,8 +638,8 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 10px', marginBottom: 8 }}>
             {[
-              { field: 'shieldBreakCount', label: '触发污染次数',   placeholder: '次数',           color: '#D4560A' },
-              { field: 'polluted',         label: '污染精灵',       placeholder: '只',             color: '#8B4BB8' },
+              { field: 'shieldBreakCount', label: '奇遇次数',   placeholder: '次数',           color: '#D4560A' },
+              { field: 'polluted',         label: '污染血脉',   placeholder: '只',             color: '#8B4BB8' },
               { field: 'original',         label: '原色精灵',       placeholder: '只',             color: '#4B9C46' },
               { field: 'ballsUsed',        label: '消耗球数（总）', placeholder: '三格都填时自动算', color: '#2B2A2E' },
             ].map(({ field, label, placeholder, color }) => (

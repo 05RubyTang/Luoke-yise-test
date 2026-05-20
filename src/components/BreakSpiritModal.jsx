@@ -46,11 +46,11 @@ function SpiritCard({ name, label, onClick }) {
 }
 
 /**
- * 选择这次触发污染的是哪只精灵。
+ * 选择这次奇遇的是哪只精灵。
  *
  * Props:
  *   plan        - 当前方案
- *   result      - 'original' | 'polluted'（用于显示上下文）
+ *   result      - 'original' | 'polluted' | 'shiny_blood' | 'mixed_blood'（用于显示上下文）
  *   onSelect(spiritName) - 确认选择回调
  *   onClose     - 关闭回调
  *   hasTabBar   - 是否有底部 TabBar（影响 overlay 高度）
@@ -113,8 +113,13 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
     resolveSpirit(plan.fruitB, plan.spiritB) && { name: resolveSpirit(plan.fruitB, plan.spiritB) },
   ].filter(Boolean);
 
-  const resultLabel = result === 'original' ? '原色精灵' : '污染精灵';
-  const resultColor = result === 'original' ? 'var(--success)' : 'var(--polluted)';
+  const RESULT_META = {
+    original:    { label: '原色精灵', color: 'var(--success)' },
+    polluted:    { label: '污染血脉', color: 'var(--polluted)' },
+    shiny_blood: { label: '奇异血脉', color: '#9B59B6' },
+    mixed_blood: { label: '混血血脉', color: '#5B6DF6' },
+  };
+  const { label: resultLabel, color: resultColor } = RESULT_META[result] || RESULT_META.polluted;
 
   return createPortal(
     <div
@@ -127,7 +132,13 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
         {/* 标题 */}
         <div style={{ marginBottom: 16 }}>
           <div className="modal-title" style={{ marginBottom: 4 }}>
-            {result === 'original' ? '出现了哪只原色精灵？' : '出现了哪只污染精灵？'}
+            {result === 'original'
+              ? '出现了哪只原色精灵？'
+              : result === 'shiny_blood'
+                ? '出现了哪只奇异血脉精灵？'
+                : result === 'mixed_blood'
+                  ? '出现了哪只混血血脉精灵？'
+                  : '出现了哪只污染血脉精灵？'}
           </div>
           <div style={{
             fontSize: 11, color: 'var(--text-muted)',

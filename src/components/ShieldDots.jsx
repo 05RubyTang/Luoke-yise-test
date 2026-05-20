@@ -33,7 +33,7 @@ function DotSpiritImg({ name }) {
 }
 
 /**
- * 触发污染色块列表
+ * 奇遇色块列表
  * 每格根据 break 记录类型着色，并显示精灵小图标（如有）。
  *
  * @param {Array}  breaks - task.shieldBreaks 数组
@@ -55,6 +55,10 @@ export default function ShieldDots({ breaks, max = 80 }) {
         inner = <span className="dot-emoji">✨</span>;
       } else if (b.result === 'jelly') {
         inner = <span className="dot-emoji">🍮</span>;
+      } else if (b.result === 'shiny_blood') {
+        inner = b.spiritName ? <DotSpiritImg name={b.spiritName} /> : <span className="dot-emoji">💜</span>;
+      } else if (b.result === 'mixed_blood') {
+        inner = b.spiritName ? <DotSpiritImg name={b.spiritName} /> : <span className="dot-emoji">🔮</span>;
       } else if (b.spiritName) {
         // original / polluted + 有精灵名：显示精灵头像（支持 wiki 兜底）
         inner = <DotSpiritImg name={b.spiritName} />;

@@ -80,7 +80,7 @@ export default function Recorder({ planId, navigate }) {
       setShowShinySelect(true);
       return;
     }
-    // 'original' | 'polluted'：暂存结果，弹出精灵选择弹窗
+    // 'original' | 'polluted' | 'shiny_blood' | 'mixed_blood'：暂存结果，弹出精灵选择弹窗
     setPendingResult(result);
     setShowBreakSpiritSelect(true);
   };
@@ -368,13 +368,13 @@ export default function Recorder({ planId, navigate }) {
         </span>
       </div>
 
-      {/* ★ 记录触发污染大按钮 ★ */}
+      {/* ★ 记录奇遇大按钮 ★ */}
       <button
         className="recorder-btn-break"
         onClick={() => setShowResult(true)}
       >
-        <img src={`${import.meta.env.BASE_URL}break-shield.webp`} alt="触发污染" style={{ width: 32, height: 32, objectFit: 'contain' }} />
-        <span>记录一次触发污染</span>
+        <img src={`${import.meta.env.BASE_URL}break-shield.webp`} alt="奇遇" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+        <span>记录一次奇遇</span>
       </button>
 
       {/* 工具栏 */}
@@ -769,14 +769,24 @@ export default function Recorder({ planId, navigate }) {
         boxShadow: 'none',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span className="font-subtitle" style={{ fontSize: 13, fontWeight: 800 }}>触发污染记录</span>
-          <div style={{ display: 'flex', gap: 10, fontSize: 11, fontWeight: 700 }}>
+          <span className="font-subtitle" style={{ fontSize: 13, fontWeight: 800 }}>奇遇记录</span>
+          <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 700, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
             <span style={{ color: 'var(--success)' }}>
               原色×{task.shieldBreaks.filter(b => b.result === 'original').length}
             </span>
             <span style={{ color: 'var(--polluted)' }}>
               污染×{task.shieldBreaks.filter(b => b.result === 'polluted').length}
             </span>
+            {task.shieldBreaks.some(b => b.result === 'shiny_blood') && (
+              <span style={{ color: '#9B59B6' }}>
+                奇异×{task.shieldBreaks.filter(b => b.result === 'shiny_blood').length}
+              </span>
+            )}
+            {task.shieldBreaks.some(b => b.result === 'mixed_blood') && (
+              <span style={{ color: '#5B6DF6' }}>
+                混血×{task.shieldBreaks.filter(b => b.result === 'mixed_blood').length}
+              </span>
+            )}
             <span style={{ color: 'var(--gold)' }}>
               异色×{task.shieldBreaks.filter(b => b.result === 'shiny').length}
             </span>

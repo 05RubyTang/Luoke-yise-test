@@ -362,7 +362,7 @@ function RecordRow({ rec, index }) {
       <div style={{ padding: '10px 0', borderTop: '1px solid var(--divider)' }}>
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
           {plan && <PlanIcon plan={plan} size={14} />}
-          第{index + 1}次 · {plan?.type} · {rec.shieldBreakCount}次触发污染
+          第{index + 1}次 · {plan?.type} · {rec.shieldBreakCount}次奇遇
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input type="number" inputMode="numeric"
@@ -396,7 +396,7 @@ function RecordRow({ rec, index }) {
           第{index + 1}次 · {plan?.type}
         </span>
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--cta)' }}>
-          {rec.shieldBreakCount}次触发污染
+          {rec.shieldBreakCount}次奇遇
         </span>
         {rec.ballsUsed != null
           ? <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>{rec.ballsUsed} 咕噜球</span>

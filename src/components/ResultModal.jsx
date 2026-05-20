@@ -30,55 +30,82 @@ export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
             取消
           </button>
           <div className="modal-title" style={{ margin: 0, flex: 1, textAlign: 'center' }}>
-            这次触发污染结果？
+            这次的奇遇事件？
           </div>
           {/* 右侧占位，让标题居中 */}
           <div style={{ flexShrink: 0, width: 44 }} />
         </div>
 
-        <button className="modal-option" onClick={() => onResult('original')}>
-          <span className="modal-option-icon">🟢</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>原色精灵</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>精灵恢复正常形态</div>
-          </div>
-        </button>
+        {/* 选项网格：一行 2 个 */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
-        <button className="modal-option" onClick={() => onResult('polluted')}>
-          <span className="modal-option-icon">🟣</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>污染精灵</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>带有紫色污染血脉</div>
-          </div>
-        </button>
+          <button className="modal-option modal-option--grid" onClick={() => onResult('original')}>
+            <span className="modal-option-icon">🟢</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>原色精灵</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>精灵恢复正常形态</div>
+            </div>
+          </button>
 
+          <button className="modal-option modal-option--grid" onClick={() => onResult('polluted')}>
+            <span className="modal-option-icon">🟣</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>污染血脉</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>带有紫色污染血脉</div>
+            </div>
+          </button>
+
+          <button className="modal-option modal-option--grid" onClick={() => onResult('shiny_blood')}>
+            <span className="modal-option-icon">💜</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>奇异血脉</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>出现奇异形态血脉</div>
+            </div>
+          </button>
+
+          <button className="modal-option modal-option--grid" onClick={() => onResult('mixed_blood')}>
+            <span className="modal-option-icon">🔮</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>混血血脉</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>出现混合血脉形态</div>
+            </div>
+          </button>
+
+          <button
+            className="modal-option modal-option--grid"
+            onClick={() => onResult('shiny')}
+            style={{ borderColor: '#C8A020', background: '#FFF9E0', boxShadow: '0 2px 0 #C8A020' }}
+          >
+            <span className="modal-option-icon">✨</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: '#C8830A' }}>异色精灵！</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>稀有配色精灵出现</div>
+            </div>
+          </button>
+
+          <button className="modal-option modal-option--grid" onClick={() => onResult('jelly')}>
+            <span className="modal-option-icon">🍮</span>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>果冻 / 星辰虫</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>仅计世界池，不计保底</div>
+            </div>
+          </button>
+
+        </div>
+
+        {/* 触发失败：独占一行（窄版） */}
         <button
           className="modal-option"
-          onClick={() => onResult('shiny')}
-          style={{ borderColor: '#C8A020', background: '#FFF9E0', boxShadow: '0 2px 0 #C8A020' }}
+          onClick={() => onResult('failed')}
+          style={{ marginTop: 8 }}
         >
-          <span className="modal-option-icon">✨</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: '#C8830A' }}>异色精灵！</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>稀有配色精灵出现</div>
-          </div>
-        </button>
-
-        <button className="modal-option" onClick={() => onResult('jelly')}>
-          <span className="modal-option-icon">🍮</span>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>果冻 / 星辰虫</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>仅计入世界池，不计保底次数</div>
-          </div>
-        </button>
-
-        <button className="modal-option" onClick={() => onResult('failed')}>
           <span className="modal-option-icon">❌</span>
           <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>触发污染失败</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>逃跑 / 战败，本次完全不计入</div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>触发失败</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>逃跑 / 战败，本次完全不计入</div>
           </div>
         </button>
+
       </div>
     </div>,
     getModalRoot()

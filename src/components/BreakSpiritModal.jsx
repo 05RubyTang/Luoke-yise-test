@@ -2,8 +2,10 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import SpiritAvatar from './SpiritAvatar';
 import { getAllEntries } from '../data/fruitGuide';
+import { getPlanFruitsArray, resolveToTargetSpirit } from '../data/plans';
 
 const getModalRoot = () => document.getElementById('modal-root') || document.body;
+const base = import.meta.env.BASE_URL;
 
 // fruit → spirit 映射（用果实名反查正确精灵名，防止 plan.spiritX 被用户填错）
 const FRUIT_SPIRIT_MAP = {};
@@ -60,6 +62,8 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
   const [customName, setCustomName] = useState('');
   const [dropOpen, setDropOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
+  // 家族映射提示：{ original, resolved } | null
+  const [familyHint, setFamilyHint] = useState(null);
   const inputRef = useRef(null);
   const wrapRef = useRef(null);
 
@@ -86,40 +90,59 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const selectSuggestion = (name) => {
-    onSelect(name);
+  // 统一的「确认精灵」函数，自动做家族映射
+  const confirmSpirit = (rawName) => {
+    const { resolved, original, mapped } = resolveToTargetSpirit(rawName);
+    if (mapped) {
+      // 显示映射提示 500ms 后再回调，让用户能看到
+      setFamilyHint({ original, resolved });
+      setTimeout(() => {
+        setFamilyHint(null);
+        onSelect(resolved);
+      }, 900);
+    } else {
+      onSelect(resolved);
+    }
     setDropOpen(false);
+  };
+
+  const selectSuggestion = (name) => {
+    confirmSpirit(name);
   };
 
   const handleKeyDown = (e) => {
     if (dropOpen && suggestions.length > 0) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(h => Math.min(h + 1, suggestions.length - 1)); return; }
       if (e.key === 'ArrowUp')   { e.preventDefault(); setHighlighted(h => Math.max(h - 1, 0)); return; }
-      if (e.key === 'Enter')     { e.preventDefault(); selectSuggestion(suggestions[highlighted]); return; }
+      if (e.key === 'Enter')     { e.preventDefault(); confirmSpirit(suggestions[highlighted]); return; }
       if (e.key === 'Escape')    { setDropOpen(false); return; }
     }
     if (e.key === 'Enter' && (!dropOpen || suggestions.length === 0) && customName.trim()) {
-      onSelect(customName.trim());
+      confirmSpirit(customName.trim());
     }
   };
 
-  // 方案主精灵快捷按钮（最多 2 个）
-  // 优先用果实名反查正确精灵名（防止用户在 PlanEditor 里填错了 spiritA/B）
-  const resolveSpirit = (fruitName, spiritName) =>
-    (fruitName && FRUIT_SPIRIT_MAP[fruitName]) || spiritName || null;
-
-  const mainSpirits = [
-    resolveSpirit(plan.fruitA, plan.spiritA) && { name: resolveSpirit(plan.fruitA, plan.spiritA) },
-    resolveSpirit(plan.fruitB, plan.spiritB) && { name: resolveSpirit(plan.fruitB, plan.spiritB) },
-  ].filter(Boolean);
+  // 方案主精灵快捷按钮（支持 3+ 个：优先读 plan.fruits[]，兼容 fruitA/fruitB）
+  // 优先用果实名反查正确精灵名（防止用户在 PlanEditor 里填错了 spiritX）
+  const mainSpirits = useMemo(() => {
+    const fruitsArr = getPlanFruitsArray(plan);
+    const seen = new Set();
+    return fruitsArr
+      .map(f => {
+        const name = (f.fruit && FRUIT_SPIRIT_MAP[f.fruit]) || f.spirit || null;
+        return name ? { name } : null;
+      })
+      .filter(Boolean)
+      .filter(s => { if (seen.has(s.name)) return false; seen.add(s.name); return true; });
+  }, [plan]);
 
   const RESULT_META = {
-    original:    { label: '原色精灵', color: 'var(--success)' },
-    polluted:    { label: '污染血脉', color: 'var(--polluted)' },
-    shiny_blood: { label: '奇异血脉', color: '#9B59B6' },
-    mixed_blood: { label: '混血血脉', color: '#5B6DF6' },
+    original:    { label: '原色精灵', color: 'var(--success)', icon: 'icon-original.webp' },
+    polluted:    { label: '污染血脉', color: 'var(--polluted)', icon: 'icon-polluted.webp' },
+    shiny_blood: { label: '奇异血脉', color: '#0BAF8A',        icon: 'icon-shiny-blood.webp' },
+    mixed_blood: { label: '混血血脉', color: '#5B6DF6',        icon: 'icon-mixed-blood.webp' },
   };
-  const { label: resultLabel, color: resultColor } = RESULT_META[result] || RESULT_META.polluted;
+  const { label: resultLabel, color: resultColor, icon: resultIcon } = RESULT_META[result] || RESULT_META.polluted;
 
   return createPortal(
     <div
@@ -128,6 +151,26 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
     >
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-handle" />
+
+        {/* 家族映射提示 Toast */}
+        {familyHint && (
+          <div style={{
+            margin: '0 0 12px',
+            padding: '8px 12px',
+            borderRadius: 10,
+            background: 'rgba(200,131,10,0.1)',
+            border: '1.5px solid rgba(200,131,10,0.35)',
+            fontSize: 12, lineHeight: 1.6, color: '#9A6A00',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: 16, flexShrink: 0 }}>🔄</span>
+            <span>
+              <span style={{ fontWeight: 700 }}>「{familyHint.original}」</span>
+              {' '}是同家族精灵，已自动匹配为{' '}
+              <span style={{ fontWeight: 800, color: '#C8830A' }}>「{familyHint.resolved}」</span>
+            </span>
+          </div>
+        )}
 
         {/* 标题 */}
         <div style={{ marginBottom: 16 }}>
@@ -144,7 +187,8 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
             fontSize: 11, color: 'var(--text-muted)',
             display: 'flex', alignItems: 'center', gap: 4,
           }}>
-            <span style={{ color: resultColor, fontWeight: 800 }}>● {resultLabel}</span>
+            <img src={`${base}${resultIcon}`} alt={resultLabel} style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }} />
+            <span style={{ color: resultColor, fontWeight: 800 }}>{resultLabel}</span>
           </div>
         </div>
 
@@ -232,7 +276,7 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
             </div>
             <button
               disabled={!customName.trim()}
-              onClick={() => customName.trim() && onSelect(customName.trim())}
+              onClick={() => customName.trim() && confirmSpirit(customName.trim())}
               style={{
                 flexShrink: 0, alignSelf: 'flex-start',
                 padding: '11px 16px',

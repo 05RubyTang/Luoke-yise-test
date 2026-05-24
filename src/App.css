@@ -754,7 +754,7 @@ body.hide-scrollbar::-webkit-scrollbar { display: none; }
 /* 奇异血脉：深紫色边框 + 淡紫背景 */
 .shield-dot.shiny_blood {
   background: #F5EEFF;
-  border-color: #9B59B6;
+  border-color: #0BAF8A;
 }
 /* 混血血脉：靛蓝边框 + 淡蓝背景 */
 .shield-dot.mixed_blood {

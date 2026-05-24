@@ -80,8 +80,8 @@ const ALL_SHINIES_BY_SEASON = (() => {
   // S2：用 S2_PLANS 里有 shinies 的方案
   const s2Groups = buildShinyGroups(S2_PLANS.filter(p => p.shinies?.length > 0));
   return [
-    { season: 'S1', label: 'S1 经典', groups: s1Groups },
     { season: 'S2', label: 'S2 狂欢', groups: s2Groups },
+    { season: 'S1', label: 'S1 经典', groups: s1Groups },
   ];
 })();
 // 扁平化（全选/清空时用）
@@ -226,7 +226,7 @@ function FruitInput({ value, onChange, placeholder, required }) {
 
 // ── 异色精灵选择弹窗（S1/S2 赛季分Tab） ────────────────────────────────────────
 function ShinyPickerModal({ pendingShinies, setPendingShinies, togglePending, spirits, onCancel, onConfirm }) {
-  const [activeSeason, setActiveSeason] = useState('S1');
+  const [activeSeason, setActiveSeason] = useState('S2');
   const seasonData = ALL_SHINIES_BY_SEASON.find(s => s.season === activeSeason) || ALL_SHINIES_BY_SEASON[0];
   const currentGroups = seasonData.groups;
 
@@ -241,7 +241,7 @@ function ShinyPickerModal({ pendingShinies, setPendingShinies, togglePending, sp
     >
       <div style={{
         width: '100%', maxHeight: '82vh',
-        background: 'var(--bg)', borderRadius: '18px 18px 0 0',
+        background: '#EFE9DC', borderRadius: '18px 18px 0 0',
         display: 'flex', flexDirection: 'column',
         boxShadow: '0 -4px 24px rgba(0,0,0,0.18)',
       }}>
@@ -755,6 +755,10 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
 
   const [attrId,  setAttrId]  = useState(initAttrId);
   const [label,   setLabel]   = useState(initLabel);
+  // 赛季选择：编辑时读已存值，新建时默认当前赛季（兜底 'S2'）
+  const [selectedSeason, setSelectedSeason] = useState(
+    existingUserPlan?.season || state.currentSeason || 'S2'
+  );
   // fruits 是数组：[{ fruit, spirit, attrManual }, ...]，最多 6 个
   const [fruits,  setFruits]  = useState(initFruits);
   // 属性 picker sheet 开关：记录当前打开的槽位 index（null 表示关闭）
@@ -874,6 +878,8 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
       spiritB: validFruits[1]?.spirit?.trim() || null,
       // 用户自选可抓异色精灵
       shinies: selectedShinies,
+      // 赛季归属
+      season: selectedSeason,
     };
     dispatch({ type: 'SAVE_USER_PLAN', plan });
     setSaved(true);
@@ -1011,6 +1017,34 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
           maxLength={16}
           placeholder="推荐填写庇护所名称，如「星霜崖」"
         />
+
+        {/* ── 赛季选择 ── */}
+        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0 }}>归属赛季</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {['S1', 'S2'].map(s => {
+              const active = selectedSeason === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setSelectedSeason(s)}
+                  style={{
+                    padding: '4px 16px', borderRadius: 8, cursor: 'pointer',
+                    fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 800,
+                    border: active ? '2px solid #C8830A' : '1.5px solid var(--divider)',
+                    background: active ? '#FFF9E0' : 'var(--card-inner)',
+                    color: active ? '#C8830A' : 'var(--text-muted)',
+                    boxShadow: active ? '0 2px 0 #C8A020' : 'none',
+                    transition: 'all 0.15s',
+                  }}
+                >{s}</button>
+              );
+            })}
+          </div>
+          <span style={{ fontSize: 10, color: 'rgba(103,93,83,0.45)', lineHeight: 1.4 }}>
+            影响首页「本赛季」统计
+          </span>
+        </div>
       </div>
 
       {/* ── 精灵 & 果实配置 ── */}

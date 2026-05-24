@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { PLANS, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, ATTR_LABEL } from '../data/plans';
+import { PLANS, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, ATTR_LABEL, classifyResultType } from '../data/plans';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
 import ShieldDots from '../components/ShieldDots';
@@ -85,15 +85,17 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   const mixedBlood = breakdowns.mixed_blood || 0;
   const hasShieldBreaks = task.shieldBreaks && task.shieldBreaks.length > 0;
 
-  // ── 三池进度快照（从 shieldBreaks 的 pool 字段聚合，旧数据可能无 pool 字段）──
+  // ── 三池进度快照（从 shieldBreaks 聚合，优先用 spiritName 实时推断，兜底读 pool 字段）──
   const POOL_RESULT_TYPES = ['polluted', 'original', 'jelly', 'shiny_blood', 'mixed_blood'];
   const poolSnapshot = (() => {
     if (!hasShieldBreaks) return null;
     let family = 0, attr = 0, world = 0, unknown = 0;
     for (const b of task.shieldBreaks) {
-      if (b.pool === 'family') family++;
-      else if (b.pool === 'attr') attr++;
-      else if (b.pool === 'world') world++;
+      // 优先用 spiritName 实时推断（修正旧数据中因精灵缺录导致的错误 pool 值）
+      const resolvedPool = b.spiritName ? classifyResultType(b.spiritName, plan) : b.pool;
+      if (resolvedPool === 'family') family++;
+      else if (resolvedPool === 'attr') attr++;
+      else if (resolvedPool === 'world') world++;
       else if (POOL_RESULT_TYPES.includes(b.result)) unknown++;
     }
     // 全无 pool 字段（纯旧数据）则不展示快照，避免全显示 0 误导用户
@@ -259,12 +261,12 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
                 {/* 赛季球 */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, borderRight: '1px solid #D3CFC8', paddingLeft: 8, paddingRight: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <img src={`${base}ball-sea.webp`} alt="赛季球" style={{ width: 25, height: 25, objectFit: 'contain', flexShrink: 0 }} />
+                    <img src={task.season === 'S2' ? `${base}ball-sea-s2.webp` : `${base}ball-sea.webp`} alt="赛季球" style={{ width: 25, height: 25, objectFit: 'contain', flexShrink: 0 }} />
                     <span className="font-subtitle" style={{ fontSize: 28, fontWeight: 900, color: '#7E57C2', lineHeight: 1 }}>
                       {task.ballsUsedByType?.sea ?? 0}
                     </span>
                   </div>
-                  <div className="font-subtitle" style={{ fontSize: 12, color: '#675D53', fontWeight: 700 }}>赛季球</div>
+                  <div className="font-subtitle" style={{ fontSize: 12, color: '#675D53', fontWeight: 700 }}>{task.season === 'S2' ? '奇趣球' : '捕光球'}</div>
                 </div>
                 {/* 属性球 */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingLeft: 8 }}>
@@ -348,7 +350,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
                 <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <span style={{ color: 'var(--success)' }}>原色×{original}</span>
                   <span style={{ color: 'var(--polluted)' }}>污染×{polluted}</span>
-                  {shinyBlood > 0 && <span style={{ color: '#9B59B6' }}>奇异×{shinyBlood}</span>}
+                  {shinyBlood > 0 && <span style={{ color: '#0BAF8A' }}>奇异×{shinyBlood}</span>}
                   {mixedBlood > 0 && <span style={{ color: '#5B6DF6' }}>混血×{mixedBlood}</span>}
                   {shiny > 0 && <span style={{ color: 'var(--gold)' }}>异色×{shiny}</span>}
                 </div>

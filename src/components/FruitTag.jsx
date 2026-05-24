@@ -178,19 +178,30 @@ export default function FruitTag({ name, size = 18, showName = true, style = {} 
 }
 
 /**
- * FruitLine — 渲染「fruitA [+ fruitB]」一行
- * 用法：<FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={16} />
+ * FruitLine — 渲染果实列表一行
+ *
+ * 支持两种用法：
+ *   旧用法：<FruitLine fruitA="治愈兔果实" fruitB="火红尾果实" size={16} />
+ *   新用法：<FruitLine fruits={getPlanFruitsArray(plan)} size={16} />
+ *   fruits 优先级高于 fruitA/fruitB
  */
-export function FruitLine({ fruitA, fruitB, size = 16, textStyle = {} }) {
+export function FruitLine({ fruitA, fruitB, fruits, size = 16, textStyle = {} }) {
+  // 规范化：优先用 fruits 数组，否则从 fruitA/fruitB 构建
+  const list = Array.isArray(fruits) && fruits.length > 0
+    ? fruits.map(f => (typeof f === 'string' ? f : f?.fruit)).filter(Boolean)
+    : [fruitA, fruitB].filter(Boolean);
+
+  if (list.length === 0) return null;
+
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', ...textStyle }}>
-      <FruitTag name={fruitA} size={size} />
-      {fruitB ? (
-        <>
-          <span style={{ color: 'var(--text-muted)', fontSize: size * 0.8 }}>+</span>
-          <FruitTag name={fruitB} size={size} />
-        </>
-      ) : (
+      {list.map((name, i) => (
+        <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+          {i > 0 && <span style={{ color: 'var(--text-muted)', fontSize: size * 0.8 }}>+</span>}
+          <FruitTag name={name} size={size} />
+        </span>
+      ))}
+      {list.length === 1 && (
         <span style={{ color: 'var(--text-muted)', fontSize: size * 0.85 }}>（单放）</span>
       )}
     </span>

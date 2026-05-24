@@ -418,6 +418,25 @@ export const S2_PLANS = [
     note: '恶系混刷，小夜 / 小丑公爵各约 1/2 概率',
   },
 
+  // 5-B. 恶系方案2：恶魔狼果单果（恶魔狼在 S2 无异色，进恶系池可出小夜 / 小丑公爵）
+  {
+    id: 's2_attr_evil_wolf_single',
+    season: 'S2',
+    category: 'attr',
+    type: '恶系方案2',
+    icon: '😈',
+    iconImg: `${base}attrs/evil.png`,
+    color: '#5D4037',
+    fruitA: '恶魔狼果实',
+    fruitB: null,
+    spiritA: '恶魔狼',
+    spiritB: null,
+    shinies: ['小夜', '小丑公爵'],
+    unlockA: '抓/进化 20 只恶魔狼',
+    unlockB: null,
+    note: '恶魔狼在 S2 无对应异色，进恶系池可产出小夜 / 小丑公爵异色',
+  },
+
   // 6. 混属系方案：恶魔狼果 + 月牙雪熊果（可刷除战令外所有 S2 异色）
   // 注：恶魔狼/月牙雪熊是 S1 异色精灵，此处仅作为果实使用
   {
@@ -442,7 +461,7 @@ export const S2_PLANS = [
     note: '混属系混刷，可随机检索除战令精灵（雪怪/爆焰喷喷）以外的所有 S2 异色，概率较低但覆盖面最广',
   },
 
-  // 8. 翼系：恶魔叮（锤头鹤果单果，100% 检索恶魔叮）
+  // 8. 翼系：恶魔叮（锤头鹳果单果，100% 检索恶魔叮）
   {
     id: 's2_attr_wing_demon_ding',
     season: 'S2',
@@ -451,14 +470,14 @@ export const S2_PLANS = [
     icon: '🦅',
     iconImg: `${base}attrs/wing.png`,
     color: '#7986CB',
-    fruitA: '锤头鹤果实',
+    fruitA: '锤头鹳果实',
     fruitB: null,
     spiritA: '恶魔叮',
     spiritB: null,
     shinies: ['恶魔叮'],
     unlockA: '待游戏更新后补充',
     unlockB: null,
-    note: '翼系，直刷锤头鹤果 100% 检索恶魔叮',
+    note: '翼系，直刷锤头鹳果 100% 检索恶魔叮',
   },
 
   // 9. 草系混刷：幽影树（奇丽花果 + 蹦跳花果，60+60 星光）
@@ -505,18 +524,18 @@ export const S2_PLANS = [
     id: 's2_attr_mech_drum',
     season: 'S2',
     category: 'attr',
-    type: '机械系混刷（小鼓象）',
+    type: '机械系混刷',
     icon: '⚙️',
     iconImg: `${base}attrs/mech.png`,
     color: '#78909C',
     fruitA: '波多西果实',
     fruitB: '圣剑-X果实',
     spiritA: '小鼓象',
-    spiritB: null,
-    shinies: ['小鼓象'],
+    spiritB: '音碟吼',
+    shinies: ['小鼓象', '音碟吼'],
     unlockA: '待游戏更新后补充',
     unlockB: '待游戏更新后补充',
-    note: '机械系，100% 出小鼓象异色',
+    note: '机械系混刷，可产出机械系全部 S2 异色（小鼓象 / 音碟吼）',
   },
 
   // 12. 火系混刷 B：烟花伯爵（火焰猿果 + 红绒十字果，80+60，50% 出烟花伯爵/灵狐）
@@ -524,7 +543,7 @@ export const S2_PLANS = [
     id: 's2_attr_fire_firework',
     season: 'S2',
     category: 'attr',
-    type: '火系混刷（烟花伯爵）',
+    type: '火系混刷',
     icon: '🔥',
     iconImg: `${base}attrs/fire.png`,
     color: '#E8733A',
@@ -535,7 +554,7 @@ export const S2_PLANS = [
     shinies: ['烟花伯爵', '灵狐'],
     unlockA: '待游戏更新后补充',
     unlockB: '待游戏更新后补充',
-    note: '火系，50% 出烟花伯爵/灵狐异色',
+    note: '火系混刷，可产出火系全部 S2 异色（烟花伯爵 / 灵狐）',
   },
 
   // 13. 电系混刷：炫光迪迪（星光狮果 + 酷拉果，60+60，100% 出炫光迪迪）
@@ -559,23 +578,23 @@ export const S2_PLANS = [
 
   // ─── S2 属性方案（单果版）+ 新单果方案 ─────────────────────────────────────
 
-  // 03. 火系（火焰猿单果）：火焰猿果实 → 火系池 → 灵狐 / 烟花伯爵
+  // 03. 火系混刷（火焰猿果 + 灵狐果）：双果混刷 → 火系池 → 灵狐 / 烟花伯爵
   {
     id: 's2_attr_fire_ape_single',
     season: 'S2',
     category: 'attr',
-    type: '火系（火焰猿）',
+    type: '火系',
     icon: '🔥',
     iconImg: `${base}attrs/fire.png`,
     color: '#E8733A',
     fruitA: '火焰猿果实',
-    fruitB: null,
+    fruitB: '灵狐果实',
     spiritA: '火焰猿',
-    spiritB: null,
+    spiritB: '灵狐',
     shinies: ['灵狐', '烟花伯爵'],
     unlockA: '待游戏更新后补充',
-    unlockB: null,
-    note: '火系单果，可定向刷出灵狐 / 烟花伯爵',
+    unlockB: '待游戏更新后补充',
+    note: '火系双果混刷，效率更高，可定向刷出灵狐 / 烟花伯爵',
   },
 
   // 04. 毒系（厉毒修萝）：厉毒修萝果实 → 毒系池 → 烟花伯爵 / 嘟嘟煲
@@ -583,7 +602,7 @@ export const S2_PLANS = [
     id: 's2_attr_poison_toxicvine',
     season: 'S2',
     category: 'attr',
-    type: '毒系（厉毒修萝）',
+    type: '毒系',
     icon: '☠️',
     iconImg: `${base}attrs/poison.png`,
     color: '#9C27B0',
@@ -602,7 +621,7 @@ export const S2_PLANS = [
     id: 's2_attr_ice_elecpenguin',
     season: 'S2',
     category: 'attr',
-    type: '冰系（电企鹅）',
+    type: '冰系',
     icon: '❄️',
     iconImg: `${base}attrs/ice.png`,
     color: '#42A5F5',
@@ -616,42 +635,42 @@ export const S2_PLANS = [
     note: '冰系池，灵狐属火+冰双属，冰系池可产出',
   },
 
-  // 06. 普通系（睡睡王）：睡睡王果实 → 普通系池 → 公平鸽 / 音碟吼
+  // 06. 普通系混刷（睡睡王果 + 公平鸽果）：双果混刷 → 普通系池 → 公平鸽 / 音碟吼
   {
     id: 's2_attr_normal_sleepking',
     season: 'S2',
     category: 'attr',
-    type: '普通系（睡睡王）',
+    type: '普通系',
     icon: '⚪',
     iconImg: `${base}attrs/normal.png`,
     color: '#A8A878',
     fruitA: '睡睡王果实',
-    fruitB: null,
+    fruitB: '公平鸽果实',
     spiritA: '睡睡王',
-    spiritB: null,
+    spiritB: '公平鸽',
     shinies: ['公平鸽', '音碟吼'],
     unlockA: '待游戏更新后补充',
-    unlockB: null,
-    note: '普通系池，可定向刷出公平鸽 / 音碟吼',
+    unlockB: '待游戏更新后补充',
+    note: '普通系双果混刷，效率更高，可定向刷出公平鸽 / 音碟吼',
   },
 
-  // 07. 机械系（波多西单果）：波多西果实 → 机械系池 → 音碟吼 / 小鼓象
+  // 07. 机械系混刷（机械方方果 + 缇塔果）：双果混刷 → 机械系池 → 小鼓象 / 音碟吼
   {
     id: 's2_attr_mech_bodoxi_single',
     season: 'S2',
     category: 'attr',
-    type: '机械系（波多西）',
+    type: '机械系',
     icon: '⚙️',
     iconImg: `${base}attrs/mech.png`,
     color: '#78909C',
-    fruitA: '波多西果实',
-    fruitB: null,
-    spiritA: '波多西',
-    spiritB: null,
+    fruitA: '机械方方果实',
+    fruitB: '缇塔果实',
+    spiritA: '机械方方',
+    spiritB: '缇塔',
     shinies: ['小鼓象', '音碟吼'],
     unlockA: '待游戏更新后补充',
-    unlockB: null,
-    note: '机械系单果，可定向刷出小鼓象 / 音碟吼',
+    unlockB: '待游戏更新后补充',
+    note: '机械系双果混刷，效率更高，可定向刷出小鼓象 / 音碟吼',
   },
 
   // 10. 萌系（梦想三三）：梦想三三果实 → 萌系池 → 菊花梨 / 加油海葵
@@ -659,7 +678,7 @@ export const S2_PLANS = [
     id: 's2_attr_cute_dreamthree',
     season: 'S2',
     category: 'attr',
-    type: '萌系（梦想三三）',
+    type: '萌系',
     icon: '🌸',
     iconImg: `${base}attrs/cute.png`,
     color: '#E91E8C',
@@ -673,23 +692,23 @@ export const S2_PLANS = [
     note: '萌系池，可定向刷出菊花梨 / 加油海葵',
   },
 
-  // 11. 水系（深蓝鲸单果）：深蓝鲸果实 → 水系池 → 加油海葵（100%）
+  // 11. 水系混刷（锤头鹳果 + 水泡壳果）：双果混刷 → 水系池 → 加油海葵
   {
     id: 's2_attr_water_whale_single',
     season: 'S2',
     category: 'attr',
-    type: '水系（深蓝鲸）',
+    type: '水系',
     icon: '💧',
     iconImg: `${base}attrs/water.png`,
     color: '#1565C0',
-    fruitA: '深蓝鲸果实',
-    fruitB: null,
-    spiritA: '深蓝鲸',
-    spiritB: null,
+    fruitA: '锤头鹳果实',
+    fruitB: '水泡壳果实',
+    spiritA: '锤头鹳',
+    spiritB: '水泡壳',
     shinies: ['加油海葵'],
     unlockA: '待游戏更新后补充',
-    unlockB: null,
-    note: '水系单果，100% 定向刷出加油海葵',
+    unlockB: '待游戏更新后补充',
+    note: '水系双果混刷，效率更高，可定向刷出加油海葵',
   },
 
   // 12. 光系（晶石蜗）：晶石蜗果实 → 光系池 → 小独角兽 / 炫光迪迪
@@ -697,7 +716,7 @@ export const S2_PLANS = [
     id: 's2_attr_light_crystalsnail',
     season: 'S2',
     category: 'attr',
-    type: '光系（晶石蜗）',
+    type: '光系',
     icon: '✨',
     iconImg: `${base}attrs/light.png`,
     color: '#FFB300',
@@ -716,7 +735,7 @@ export const S2_PLANS = [
     id: 's2_attr_electric_lionstar_single',
     season: 'S2',
     category: 'attr',
-    type: '电系（星光狮）',
+    type: '电系',
     icon: '⚡',
     iconImg: `${base}attrs/electric.png`,
     color: '#FDD835',

@@ -8,7 +8,7 @@ const getModalRoot = () => document.getElementById('modal-root') || document.bod
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
 import ShieldDots from '../components/ShieldDots';
-import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL, computePoolCounts } from '../data/plans';
+import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL, computePoolCounts, classifyResultType } from '../data/plans';
 import { SEASONS } from '../data/seasons';
 import { S2_PLANS } from '../data/seasons/s2Plans';
 
@@ -93,15 +93,17 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   const mixedBlood = breakdowns.mixed_blood || 0;
   const hasShieldBreaks = task.shieldBreaks && task.shieldBreaks.length > 0;
 
-  // ── 三池进度快照（从 shieldBreaks 的 pool 字段聚合，旧数据可能无 pool 字段）──
+  // ── 三池进度快照（从 shieldBreaks 聚合，优先用 spiritName 实时推断，兜底读 pool 字段）──
   const POOL_RESULT_TYPES = ['polluted', 'original', 'jelly', 'shiny_blood', 'mixed_blood'];
   const poolSnapshot = (() => {
     if (!hasShieldBreaks) return null;
     let family = 0, attr = 0, world = 0, unknown = 0;
     for (const b of task.shieldBreaks) {
-      if (b.pool === 'family') family++;
-      else if (b.pool === 'attr') attr++;
-      else if (b.pool === 'world') world++;
+      // 优先用 spiritName 实时推断（修正旧数据中因精灵缺录导致的错误 pool 值）
+      const resolvedPool = b.spiritName ? classifyResultType(b.spiritName, plan) : b.pool;
+      if (resolvedPool === 'family') family++;
+      else if (resolvedPool === 'attr') attr++;
+      else if (resolvedPool === 'world') world++;
       else if (POOL_RESULT_TYPES.includes(b.result)) unknown++;
     }
     // 全无 pool 字段（纯旧数据）则不展示快照，避免全显示 0 误导用户
@@ -343,12 +345,12 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
                 {/* 赛季球 */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, borderRight: '1px solid #D3CFC8', paddingLeft: 8, paddingRight: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <img src={`${base}ball-sea.webp`} alt="赛季球" style={{ width: 25, height: 25, objectFit: 'contain', flexShrink: 0 }} />
+                    <img src={task.season === 'S2' ? `${base}ball-sea-s2.webp` : `${base}ball-sea.webp`} alt="赛季球" style={{ width: 25, height: 25, objectFit: 'contain', flexShrink: 0 }} />
                     <span className="font-subtitle" style={{ fontSize: 28, fontWeight: 900, color: '#7E57C2', lineHeight: 1 }}>
                       {task.ballsUsedByType?.sea ?? 0}
                     </span>
                   </div>
-                  <div className="font-subtitle" style={{ fontSize: 12, color: '#675D53', fontWeight: 700 }}>赛季球</div>
+                  <div className="font-subtitle" style={{ fontSize: 12, color: '#675D53', fontWeight: 700 }}>{task.season === 'S2' ? '奇趣球' : '捕光球'}</div>
                 </div>
                 {/* 属性球 */}
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, paddingLeft: 8 }}>
@@ -438,7 +440,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
                 <div style={{ display: 'flex', gap: 8, fontSize: 10, fontWeight: 700, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   <span style={{ color: 'var(--success)' }}>原色×{original}</span>
                   <span style={{ color: 'var(--polluted)' }}>污染×{polluted}</span>
-                  {shinyBlood > 0 && <span style={{ color: '#9B59B6' }}>奇异×{shinyBlood}</span>}
+                  {shinyBlood > 0 && <span style={{ color: '#0BAF8A' }}>奇异×{shinyBlood}</span>}
                   {mixedBlood > 0 && <span style={{ color: '#5B6DF6' }}>混血×{mixedBlood}</span>}
                   {shiny > 0 && <span style={{ color: 'var(--gold)' }}>异色×{shiny}</span>}
                 </div>
@@ -977,6 +979,19 @@ function AvatarUploader({ avatarUrl, onFileChange }) {
 // ─── 更新公告弹窗 ─────────────────────────────────────────────────────────────
 
 const CHANGELOG = [
+  {
+    version: 'v4.1',
+    date: '2026-05-22',
+    tags: ['新方案', '新功能', '优化'],
+    items: [
+      '方案库新增「恶系方案2」：单放恶魔狼果实，进恶系池可产出小夜 / 小丑公爵异色（恶魔狼在 S2 无异色）',
+      '果实攻略新增「恶魔叮果实」：抓/进化 20 只叮叮恶魔解锁，恶、翼双属性',
+      '新建自定义方案时，选择目标异色精灵弹窗中 S2 赛季 Tab 提前展示，默认展示 S2 精灵列表',
+      '首页「S2 狂欢怪谈」赛季切换器下方新增快捷入口：「S2 惊喜盒子机制」与「三池计数机制」教程直达小红书',
+      '刷取页咕噜球补球暂停时，新增「撤回上一步」功能',
+      '出异色后点击「继续刷取」：仅重置实时保底进度条，奇遇记录不再被清空',
+    ],
+  },
   {
     version: 'v4.0',
     date: '2026-05-14',
@@ -1942,7 +1957,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       padding: '9px 0', borderBottom: '1px solid var(--divider)',
                     }}>
                       <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>版本</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.0</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.1</span>
                     </div>
                     <div
                       style={{

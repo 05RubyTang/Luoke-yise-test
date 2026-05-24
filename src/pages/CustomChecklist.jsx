@@ -451,6 +451,8 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
   const [fruitA, setFruitA]   = useState('');
   const [fruitB, setFruitB]   = useState('');
   const [shiniesRaw, setShiniesRaw] = useState(''); // 逗号分隔的精灵名
+  // 归属赛季：用户明确选择，默认跟随当前 Tab 的赛季
+  const [planSeason, setPlanSeason] = useState(state.currentSeason || 'S2');
 
   // ── 咕噜球库存 state（与 Checklist.jsx 内置方案保持一致）──────────────────
   // 仅在 saveOnly=false（即从首页「开始新刷取」入口进入需立即开刷）时使用
@@ -532,7 +534,8 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
       attrBManual: !!attrBManual,
       // 系统自动推导的方案池类型（'attr' | 'world'），便于上层展示和审计
       poolKind,
-      season: false, custom: true,
+      season: planSeason,  // 归属赛季：用户明确选择（默认跟随当前 Tab）
+      custom: true,
     };
   };
 
@@ -608,6 +611,7 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
     dispatch({
       type: 'START_TASK',
       planId: plan.id,
+      season: plan.season,
       ...ballPayload,
     });
     navigate('recorder', { planId: plan.id });
@@ -644,8 +648,45 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
         />
       </div>
 
-      {/* 果实 */}
+      {/* 归属赛季 */}
       <div className="card animate-in" style={{ animationDelay: '0.04s' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 13, fontWeight: 800 }}>归属赛季</span>
+          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>影响首页 Tab 归类</span>
+        </div>
+        <div style={{
+          display: 'flex', gap: 6,
+          background: 'var(--card-inner)', borderRadius: 8, padding: 4,
+          border: '1px solid var(--divider)',
+        }}>
+          {[
+            { key: 'S1', label: '🌙 S1 赛季' },
+            { key: 'S2', label: '🎪 S2 赛季' },
+          ].map(({ key, label }) => {
+            const active = planSeason === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setPlanSeason(key)}
+                style={{
+                  flex: 1, padding: '6px 0',
+                  borderRadius: 6, border: 'none',
+                  background: active ? '#2B2A2E' : 'transparent',
+                  color: active ? '#FBF7EC' : 'var(--text-muted)',
+                  fontSize: 12, fontWeight: active ? 800 : 600,
+                  fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 果实 */}
+      <div className="card animate-in" style={{ animationDelay: '0.07s' }}>
         <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 4 }}>果实配置</div>
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12, lineHeight: 1.6 }}>
           填果实名后会自动识别属性；若识别不准（写错了名 / 不在果实库），点旁边属性标签手动指定，三池识别就能正确累计。
@@ -759,7 +800,7 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
       </div>
 
       {/* 可出精灵 */}
-      <div className="card animate-in" style={{ animationDelay: '0.07s' }}>
+      <div className="card animate-in" style={{ animationDelay: '0.10s' }}>
         <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
           可出异色精灵 <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>（选填）</span>
         </div>
@@ -777,7 +818,7 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
 
       {/* 咕噜球库存（仅 saveOnly=false 即「开始新刷取」入口显示，与 Checklist.jsx 内置方案保持一致结构） */}
       {!saveOnly && (
-        <div className="card animate-in" style={{ animationDelay: '0.09s' }}>
+        <div className="card animate-in" style={{ animationDelay: '0.13s' }}>
           {/* 标题行 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 800 }}>咕噜球库存</span>
@@ -862,7 +903,7 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
       <button
         className={`btn animate-in${canStart ? ' btn-primary' : ''}`}
         style={{
-          animationDelay: '0.12s',
+          animationDelay: '0.16s',
           opacity: canStart ? 1 : 0.45,
           cursor: canStart ? 'pointer' : 'not-allowed',
           background: canStart ? undefined : '#B0A898',

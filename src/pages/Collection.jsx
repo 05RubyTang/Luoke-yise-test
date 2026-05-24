@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useStore } from '../store';
-import { PLANS, ATTR_SHINIES, SEASON_SHINIES, findPlansForSpirit, SPECIAL_FORMS, resolveShinyKey, S1_PLANS, S2_PLANS, SPIRIT_ATTR1, SPIRIT_ATTR2 } from '../data/plans';
+import { PLANS, ATTR_SHINIES, SEASON_SHINIES, findPlansForSpirit, SPECIAL_FORMS, resolveShinyKey, S1_PLANS, S2_PLANS, SPIRIT_ATTR1, SPIRIT_ATTR2, getPlanFruitsArray } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import { getWikiSpiritImg } from '../data/spirits-wiki';
@@ -201,8 +201,9 @@ function PlanInfo({ plan, currentSeason }) {
   const isSeasonPlan = !!plan.season;
   const isNoShiny = !!plan.noShiny;
 
-  // 判断是否为单刷池（无 fruitB）还是属性池（有 fruitB）
-  const isSingleFruit = !plan.fruitB;
+  // 判断是否为单刷池（无第二个果实）还是属性池（有多个果实）
+  const fruitsCount = plan.fruits ? plan.fruits.length : (plan.fruitA ? (plan.fruitB ? 2 : 1) : 0);
+  const isSingleFruit = fruitsCount <= 1;
 
   // 根据当前赛季过滤精灵列表
   const filterShiniesBySeason = (shinies) => {
@@ -217,18 +218,14 @@ function PlanInfo({ plan, currentSeason }) {
     : (plan.shinies || []);
   const visibleShinies = filterShiniesBySeason(rawShinies);
 
-  // 标签文字与颜色
-  const poolLabel = isSeasonPlan
-    ? '赛季单刷池'
-    : isNoShiny ? '积累属系池'
+  // 标签文字与颜色（赛季方案不再单独显示「赛季单刷池」，统一走普通池类型判断）
+  const poolLabel = isNoShiny ? '积累属系池'
     : isSingleFruit ? '单刷池' : '属性池';
-  const poolColor = isSeasonPlan
-    ? { bg: 'rgba(244,143,177,0.12)', border: 'rgba(244,143,177,0.4)', text: '#C0568A' }
-    : isNoShiny
-      ? { bg: 'rgba(255,193,7,0.1)', border: 'rgba(255,193,7,0.35)', text: '#9A7208' }
-      : isSingleFruit
-        ? { bg: 'rgba(91,156,246,0.1)', border: 'rgba(91,156,246,0.3)', text: '#4A80D0' }
-        : { bg: 'rgba(103,170,92,0.1)', border: 'rgba(103,170,92,0.3)', text: '#4A8C40' };
+  const poolColor = isNoShiny
+    ? { bg: 'rgba(255,193,7,0.1)', border: 'rgba(255,193,7,0.35)', text: '#9A7208' }
+    : isSingleFruit
+      ? { bg: 'rgba(91,156,246,0.1)', border: 'rgba(91,156,246,0.3)', text: '#4A80D0' }
+      : { bg: 'rgba(103,170,92,0.1)', border: 'rgba(103,170,92,0.3)', text: '#4A8C40' };
 
   return (
     <div style={{
@@ -271,16 +268,22 @@ function PlanInfo({ plan, currentSeason }) {
         )}
       </div>
 
-      {/* 果实公式：fruitA [+ fruitB] ＝ 精灵列表 */}
+      {/* 果实公式：fruit1 [+ fruit2 + ...] ＝ 精灵列表，支持 3+ 果实 */}
       {/* fruitA 为 null（如音碟吼，果实暂未上线）时仍渲染占位框 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'nowrap', overflowX: 'auto', paddingBottom: 2 }}>
-        <FruitImg name={plan.fruitA || null} size={56} pending={!plan.fruitA} />
-        {plan.fruitB && (
-          <>
-            <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--text-muted)', flexShrink: 0 }}>+</span>
-            <FruitImg name={plan.fruitB} size={56} />
-          </>
-        )}
+        {(() => {
+          const fruitsArr = getPlanFruitsArray(plan);
+          if (fruitsArr.length === 0) {
+            // 无果实数据：显示占位
+            return <FruitImg name={null} size={56} pending />;
+          }
+          return fruitsArr.map((f, i) => (
+            <Fragment key={i}>
+              {i > 0 && <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--text-muted)', flexShrink: 0 }}>+</span>}
+              <FruitImg name={f.fruit || null} size={56} pending={!f.fruit} />
+            </Fragment>
+          ));
+        })()}
         <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--text-muted)', flexShrink: 0 }}>＝</span>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'nowrap' }}>
           {visibleShinies.length > 0

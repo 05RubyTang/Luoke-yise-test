@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS, getPlanAttrId, classifyPool, computeFamilyPool, getPlanMainPool, resolvePlanIconImg } from '../data/plans';
+import { PLANS, getPlanAttrId, classifyPool, computeFamilyPool, getPlanMainPool, resolvePlanIconImg, getPlanFruitsArray } from '../data/plans';
 import ProgressBar from '../components/ProgressBar';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -95,8 +95,148 @@ function RecentSpiritCard({ task }) {
   );
 }
 
+/** 邮箱绑定提示横幅（marquee + 点击弹窗） */
+function EmailBindBanner({ navigate }) {
+  const [showModal, setShowModal] = useState(false);
+
+  return (
+    <>
+      {/* 单行横幅 */}
+      <button
+        onClick={() => setShowModal(true)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          width: '100%',
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          margin: '0 0 10px',
+        }}
+      >
+        <div style={{
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          overflow: 'hidden',
+          background: 'rgba(94,107,209,0.10)',
+          border: '1px solid rgba(94,107,209,0.30)',
+          borderRadius: 8,
+          padding: '5px 10px',
+          gap: 6,
+          minWidth: 0,
+        }}>
+          {/* 图标 */}
+          <span style={{ fontSize: 13, flexShrink: 0, lineHeight: 1 }}>📧</span>
+          {/* marquee 容器 */}
+          <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minWidth: 0 }}>
+            <div style={{
+              display: 'inline-block',
+              whiteSpace: 'nowrap',
+              animation: 'emailBannerScroll 18s linear infinite',
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#5E6BD1',
+              lineHeight: 1.5,
+            }}>
+              未绑定邮箱，数据仅存浏览器，清缓存将丢失！绑定邮箱后数据跟随邮箱，更稳定&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;未绑定邮箱，数据仅存浏览器，清缓存将丢失！绑定邮箱后数据跟随邮箱，更稳定
+            </div>
+          </div>
+          {/* 查看详情箭头 */}
+          <span style={{ fontSize: 10, color: '#5E6BD1', flexShrink: 0, fontWeight: 800, opacity: 0.7 }}>详情 ›</span>
+        </div>
+      </button>
+
+      {/* 详情弹窗 */}
+      {showModal && (
+        <div
+          onClick={() => setShowModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '0 20px',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#FCF7EB',
+              borderRadius: 16,
+              padding: '24px 20px 20px',
+              width: '100%',
+              maxWidth: 340,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+            }}
+          >
+            {/* 标题 */}
+            <div style={{
+              fontSize: 16, fontWeight: 900, color: '#2B2A2E',
+              marginBottom: 14, textAlign: 'center',
+              fontFamily: 'var(--font-display)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}>
+              <span>📧</span> 推荐绑定邮箱
+            </div>
+
+            {/* 说明文字 */}
+            <div style={{
+              fontSize: 13, color: '#4A4640', lineHeight: 1.8,
+              marginBottom: 18,
+              background: 'rgba(94,107,209,0.07)',
+              border: '1px solid rgba(94,107,209,0.18)',
+              borderRadius: 10,
+              padding: '12px 14px',
+            }}>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ fontWeight: 800, color: '#C0392B' }}>⚠️ 未绑定邮箱时：</span><br/>
+                刷取数据仅保存在当前浏览器本地缓存中。若浏览器自动清理缓存，或更换设备/浏览器，<strong>数据将永久丢失</strong>。
+              </div>
+              <div>
+                <span style={{ fontWeight: 800, color: '#5E6BD1' }}>✅ 绑定邮箱后：</span><br/>
+                数据会自动同步到云端，跟随邮箱账号走。换设备、换浏览器都能找回，更安全稳定。
+              </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <button
+              className="btn btn-primary"
+              style={{ width: '100%', margin: 0, padding: '12px', fontSize: 14 }}
+              onClick={() => { setShowModal(false); navigate('profile'); }}
+            >
+              去绑定邮箱 →
+            </button>
+            <button
+              onClick={() => setShowModal(false)}
+              style={{
+                width: '100%', marginTop: 10,
+                background: 'none', border: 'none',
+                fontSize: 12, color: '#9E8E80', cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+                padding: '6px 0',
+              }}
+            >
+              稍后再说
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* marquee 动画 keyframes（只注入一次） */}
+      <style>{`
+        @keyframes emailBannerScroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+      `}</style>
+    </>
+  );
+}
+
 export default function Home({ navigate }) {
-  const { state, poolCounts } = useStore();
+  const { state, poolCounts, authUser } = useStore();
+  const hasEmail = !!authUser?.email;
   const currentSeason = state.currentSeason;
   // 只展示当前赛季的进行中任务（主区域）
   const tasks = (state.activeTasks || []).filter(t => !currentSeason || !t.season || t.season === currentSeason);
@@ -124,7 +264,7 @@ export default function Home({ navigate }) {
           用耐心换来独一无二的伙伴
         </div>
         {/* 赛季切换器：嵌在 hero 区底部，右侧避开小洛克 */}
-        <div style={{ maxWidth: 'calc(100% - 110px)', paddingBottom: 14 }}>
+        <div style={{ maxWidth: 'calc(100% - 90px)', paddingBottom: 2 }}>
           <SeasonSwitcher />
         </div>
         {/* 小洛克：绝对定位右上角，完整显示在屏幕内 */}
@@ -142,6 +282,69 @@ export default function Home({ navigate }) {
           }}
         />
       </div>
+
+      {/* S2 赛季说明横幅：两个入口（全宽，矮条） */}
+      <div style={{
+        margin: '0 16px 12px',
+        display: 'flex',
+        alignItems: 'stretch',
+        borderRadius: 8,
+        overflow: 'hidden',
+        border: '1px solid rgba(232,115,58,0.35)',
+        background: 'rgba(232,115,58,0.10)',
+      }}>
+        <a
+          href="https://www.xiaohongshu.com/explore/6a0f06070000000038037c0a"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            padding: '5px 8px',
+            textDecoration: 'none',
+            color: '#D85D28',
+            fontSize: 11,
+            fontWeight: 700,
+            lineHeight: 1.3,
+          }}
+        >
+          <span style={{ fontSize: 12, flexShrink: 0 }}>🎁</span>
+          <span>s2 惊喜盒子机制</span>
+        </a>
+        {/* 分隔线 */}
+        <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(232,115,58,0.35)', flexShrink: 0 }} />
+        <a
+          href="https://www.xiaohongshu.com/explore/6a05a27f00000000380203bc"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 4,
+            padding: '5px 8px',
+            textDecoration: 'none',
+            color: '#D85D28',
+            fontSize: 11,
+            fontWeight: 700,
+            lineHeight: 1.3,
+          }}
+        >
+          <span style={{ fontSize: 12, flexShrink: 0 }}>🎡</span>
+          <span>三池计数机制</span>
+        </a>
+      </div>
+
+      {/* 邮箱绑定推荐横幅（未绑定邮箱时展示） */}
+      {!hasEmail && (
+        <div style={{ margin: '0 16px' }}>
+          <EmailBindBanner navigate={navigate} />
+        </div>
+      )}
 
       {/* 新加入的伙伴（有数据才展示） */}
       {hasRecentShinies && (
@@ -307,7 +510,7 @@ export default function Home({ navigate }) {
                   <span style={{ fontWeight: 800, fontSize: 14, color: '#fff' }}>{plan.type}方案</span>
                 </div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-                  {plan.fruitA}{plan.fruitB ? ` + ${plan.fruitB}` : ''}
+                  {getPlanFruitsArray(plan).map(f => f.fruit).filter(Boolean).join(' + ')}
                 </div>
               </div>
             </div>
@@ -501,7 +704,7 @@ export default function Home({ navigate }) {
                       <span style={{ fontWeight: 800, fontSize: 13, color: '#F0E8D5' }}>{plan.type}方案</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'rgba(240,232,213,0.5)' }}>
-                      {plan.fruitA}{plan.fruitB ? ` + ${plan.fruitB}` : ''}
+                      {getPlanFruitsArray(plan).map(f => f.fruit).filter(Boolean).join(' + ')}
                     </div>
                   </div>
                   <button

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../store';
 
 const base = import.meta.env.BASE_URL;
-import { PLANS, getShinisByAttr } from '../data/plans';
+import { PLANS, getShinisByAttr, getPlanFruitsArray } from '../data/plans';
 import PlanCard from '../components/PlanCard';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -12,8 +12,8 @@ import SeasonSwitcher from '../components/SeasonSwitcher';
 /* ─── picker 模式：弹出方案选择 sheet ─────────────────────────────────────── */
 function PlanSubPicker({ basePlan, userPlans, onSelect, onClose }) {
   const options = [
-    { id: basePlan.id, label: `${basePlan.type}（推荐）`, fruitA: basePlan.fruitA, fruitB: basePlan.fruitB, isDefault: true },
-    ...userPlans.map(p => ({ id: p.id, label: p.label, fruitA: p.fruitA, fruitB: p.fruitB, isDefault: false })),
+    { id: basePlan.id, label: `${basePlan.type}（推荐）`, plan: basePlan, isDefault: true },
+    ...userPlans.map(p => ({ id: p.id, label: p.label, plan: p, isDefault: false })),
   ];
   return (
     <>
@@ -54,7 +54,7 @@ function PlanSubPicker({ basePlan, userPlans, onSelect, onClose }) {
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  <FruitLine fruitA={opt.fruitA} fruitB={opt.fruitB} size={13} />
+                  <FruitLine fruits={getPlanFruitsArray(opt.plan)} size={13} />
                 </div>
               </div>
               <span style={{ fontSize: 16, color: 'var(--text-muted)', flexShrink: 0 }}>›</span>
@@ -68,13 +68,12 @@ function PlanSubPicker({ basePlan, userPlans, onSelect, onClose }) {
 
 /* ─── 工具函数 ─────────────────────────────────────────────────────────────── */
 
-/** 判断一个方案的果实条件是否已满足（fruitA/fruitB 是否均在 ownedFruits 中） */
+/** 判断一个方案的果实条件是否已满足（所有果实是否均在 ownedFruits 中） */
 function isFruitReady(plan, ownedFruits) {
   const owned = new Set(ownedFruits || []);
-  if (!plan.fruitA) return true; // 无果实信息视为满足
-  const aOk = owned.has(plan.fruitA);
-  const bOk = !plan.fruitB || owned.has(plan.fruitB);
-  return aOk && bOk;
+  const fruits = getPlanFruitsArray(plan);
+  if (fruits.length === 0) return true; // 无果实信息视为满足
+  return fruits.every(f => !f.fruit || owned.has(f.fruit));
 }
 
 /** 果实未集齐标记 */
@@ -218,7 +217,7 @@ function AttrPlanCard({ plan, userPlans, spirits, completedTasks, activeTasks, o
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: isNoShiny ? 4 : 10 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--text-light)' }}>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginRight: 4 }}>果实：</span>
-            <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
+            <FruitLine fruits={getPlanFruitsArray(plan)} size={14} />
           </div>
           {!fruitReady && <FruitMissingBadge />}
           {!isNoShiny && fruitReady && (avgInfo
@@ -320,7 +319,7 @@ function SeasonPlanCard({ plan, spirits, completedTasks, activeTasks, onClick, s
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <div style={{ flex: 1, minWidth: 0, fontSize: 11, color: 'var(--text-light)' }}>
             <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginRight: 4 }}>果实：</span>
-            <FruitLine fruitA={plan.fruitA} fruitB={null} size={14} />
+            <FruitLine fruits={getPlanFruitsArray(plan)} size={14} />
           </div>
           {!fruitReady && <FruitMissingBadge />}
           {fruitReady && (avgInfo
@@ -845,7 +844,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
                     </div>
                     <div style={{ padding: '8px 12px 10px' }}>
                       <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5 }}>
-                        <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={13} />
+                        <FruitLine fruits={getPlanFruitsArray(plan)} size={13} />
                       </div>
                       <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                         {plan.shinies?.slice(0, 4).map(name => (
@@ -1187,7 +1186,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
                   </div>
                   <div style={{ padding: '8px 12px 10px' }}>
                     <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 5 }}>
-                      <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={13} />
+                      <FruitLine fruits={getPlanFruitsArray(plan)} size={13} />
                     </div>
                     <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexWrap: 'wrap' }}>
                       {plan.shinies?.slice(0, 4).map(name => (
@@ -1226,17 +1225,28 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
             <span style={{ fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>{sortedAttr.length} 个</span>
           </div>
           {sortedAttr.map(({ plan, fruitReady }) => (
-            <AttrPlanCard
-              key={plan.id}
-              plan={plan}
-              userPlans={state.userPlanConfig}
-              spirits={state.spirits}
-              completedTasks={state.completedTasks}
-              activeTasks={currentSeasonActiveTasks}
-              pinned={activePlanIds.has(plan.id)}
-              fruitReady={fruitReady}
-              onClick={() => navigate('attrPlanDetail', { planId: plan.id })}
-            />
+            plan.noShiny ? (
+              <AttrPlanCard
+                key={plan.id}
+                plan={plan}
+                userPlans={state.userPlanConfig}
+                spirits={state.spirits}
+                completedTasks={state.completedTasks}
+                activeTasks={currentSeasonActiveTasks}
+                pinned={activePlanIds.has(plan.id)}
+                fruitReady={fruitReady}
+                onClick={() => navigate('attrPlanDetail', { planId: plan.id })}
+              />
+            ) : (
+              <div key={plan.id} style={{ padding: '0 16px 0' }}>
+                <PlanCard
+                  plan={plan} spirits={state.spirits}
+                  isActive={activePlanIds.has(plan.id)}
+                  completedTasks={state.completedTasks}
+                  onClick={() => navigate('checklist', { planId: plan.id, basePlanId: plan.id })}
+                />
+              </div>
+            )
           ))}
         </>
       )}

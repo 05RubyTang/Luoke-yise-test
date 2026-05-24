@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS, S2_PLANS, SPECIAL_FORMS, resolvePlanIconImg } from '../data/plans';
+import { PLANS, S2_PLANS, SPECIAL_FORMS, resolvePlanIconImg, getPlanFruitsArray } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import FruitTag, { FruitLine } from '../components/FruitTag';
@@ -44,26 +44,22 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
   // 标准化：自定义方案继承基础属性方案的图标
   const attrBase = rawPlan?.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
 
-  // 自定义方案：通过 fruitA/fruitB 在 PLANS 里反查对应的解锁条件
+  // 自定义方案：通过各果实名在 PLANS 里反查对应的解锁条件
   // 仅当自定义方案自身没有 unlockA/B 时才做反查
   const isUserPlan = !!(rawPlan?.attrId); // 有 attrId 说明是自定义方案
   const fruitUnlockMap = (() => {
     if (!isUserPlan || !rawPlan) return {};
     const result = {};
-    if (rawPlan.fruitA) {
-      const src = PLANS.find(p => p.fruitA === rawPlan.fruitA || p.fruitB === rawPlan.fruitA);
+    // 统一处理：遍历所有果实（兼容旧 fruitA/fruitB 和新 fruits[] 结构）
+    const fruitsToCheck = getPlanFruitsArray(rawPlan);
+    fruitsToCheck.forEach(({ fruit }, i) => {
+      if (!fruit) return;
+      const src = PLANS.find(p => p.fruitA === fruit || p.fruitB === fruit);
       if (src) {
-        const unlock = src.fruitA === rawPlan.fruitA ? src.unlockA : src.unlockB;
-        result.fruitA = unlock || '';
+        const unlock = src.fruitA === fruit ? src.unlockA : src.unlockB;
+        result[i] = unlock || '';
       }
-    }
-    if (rawPlan.fruitB) {
-      const src = PLANS.find(p => p.fruitA === rawPlan.fruitB || p.fruitB === rawPlan.fruitB);
-      if (src) {
-        const unlock = src.fruitA === rawPlan.fruitB ? src.unlockA : src.unlockB;
-        result.fruitB = unlock || '';
-      }
-    }
+    });
     return result;
   })();
 
@@ -71,8 +67,8 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
     ...rawPlan,
     type:    rawPlan.type    || rawPlan.label || '自定义方案',
     shinies: Array.isArray(rawPlan.shinies) ? rawPlan.shinies : [],
-    unlockA: rawPlan.unlockA || fruitUnlockMap.fruitA || '',
-    unlockB: rawPlan.unlockB || fruitUnlockMap.fruitB || '',
+    unlockA: rawPlan.unlockA || fruitUnlockMap[0] || '',
+    unlockB: rawPlan.unlockB || fruitUnlockMap[1] || '',
     // 自定义方案无 iconImg/icon 时从基础方案继承（异属混刷会用混刷专属图标）
     iconImg: resolvePlanIconImg(rawPlan, attrBase),
     icon:    rawPlan.icon    || attrBase?.icon    || '✨',
@@ -91,18 +87,18 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
   const poolSiblings = PLANS.filter(p => p.noShiny && p.attrId === baseAttrId);
   const switcherOptions = basePlan ? [
     // 基础推荐方案
-    { id: basePlan.id, label: `${basePlan.type}（推荐）`, fruitA: basePlan.fruitA, fruitB: basePlan.fruitB, tag: null },
+    { id: basePlan.id, label: `${basePlan.type}（推荐）`, plan: basePlan, tag: null },
     // 积累属系池方案
     ...poolSiblings.map(p => ({
       id: p.id,
       label: p.type,
-      fruitA: p.fruitA, fruitB: p.fruitB,
+      plan: p,
       tag: '回顾价格高',
     })),
     // 同属性的用户自定义方案
     ...(state.userPlanConfig || [])
       .filter(p => p.attrId === baseAttrId)
-      .map(p => ({ id: p.id, label: p.label || '自定义方案', fruitA: p.fruitA, fruitB: p.fruitB, tag: '自定义' })),
+      .map(p => ({ id: p.id, label: p.label || '自定义方案', plan: p, tag: '自定义' })),
   ] : null;
 
   if (!plan) return null;
@@ -112,8 +108,8 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
     const existingTask = (state.activeTasks || []).find(t => t.planId === plan.id);
     const taskExists = !!existingTask;
 
-    // 从方案对象中取赛季标记：plan.season 统一为 'S1'/'S2' 字符串，fallback 到 'S1'
-    const planSeason = (typeof plan.season === 'string' && plan.season) ? plan.season : 'S1';
+    // 从方案对象中取赛季标记：plan.season 统一为 'S1'/'S2' 字符串，fallback 到 currentSeason → 'S1'
+    const planSeason = (typeof plan.season === 'string' && plan.season) ? plan.season : (state.currentSeason || 'S1');
 
     if (ballMode === 'byType') {
       const adv = parseInt(ballAdv.trim(), 10) || 0;
@@ -227,11 +223,15 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
                       }}>{opt.tag}</span>
                     )}
                   </div>
-                  {(opt.fruitA || opt.fruitB) && (
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {opt.fruitA}{opt.fruitB ? ` + ${opt.fruitB}` : ''}
-                    </div>
-                  )}
+                  {(() => {
+                    const fruitsArr = getPlanFruitsArray(opt.plan);
+                    const fruitNames = fruitsArr.map(f => f.fruit).filter(Boolean);
+                    return fruitNames.length > 0 ? (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                        {fruitNames.join(' + ')}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 {isSelected && (
                   <span style={{ fontSize: 14, color: '#C8830A', flexShrink: 0 }}>✓</span>
@@ -269,7 +269,7 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
               {plan.season ? `${plan.type} 异色刷取` : `${plan.type}方案`}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
-              <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={15} />
+              <FruitLine fruits={getPlanFruitsArray(plan)} size={15} />
             </div>
             {plan.season && isObtained && (
               <div style={{
@@ -282,21 +282,6 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
           </div>
         </div>
 
-        {/* 属性方案：刷取循环 */}
-        {!plan.season && (
-          <div style={{
-            background: 'var(--card-inner)',
-            borderRadius: 10, padding: '10px 12px', marginBottom: 14,
-            fontSize: 13, color: 'var(--text-light)', lineHeight: 1.8,
-          }}>
-            <span style={{ color: 'var(--gold)', fontWeight: 800, fontSize: 11, letterSpacing: 0.5 }}>
-              刷取循环
-            </span>
-            <br />
-            抓3只{plan.spiritA}
-            {plan.spiritB ? ` → 抓3只${plan.spiritB} → 循环` : ' → 每3只一轮，反复循环'}
-          </div>
-        )}
 
         {/* 赛季方案：庇护所 + 同放果实 + 解锁条件，合并在一张卡内 */}
         {plan.season && (
@@ -395,11 +380,11 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
         <div className="card animate-in" style={{ animationDelay: '0.05s' }}>
           <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10 }}>解锁条件</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {[
-              { label: plan.fruitA, desc: plan.unlockA },
-              plan.fruitB ? { label: plan.fruitB, desc: plan.unlockB } : null,
-            ].filter(Boolean).map((item, i) => {
-              const isPokedex = isPokedexUnlock(item.desc);
+            {getPlanFruitsArray(plan).map(({ fruit }, i) => {
+              if (!fruit) return null;
+              // 优先读方案自身字段（unlockA/B），再从 fruitUnlockMap 取反查结果
+              const desc = i === 0 ? plan.unlockA : (i === 1 ? plan.unlockB : (fruitUnlockMap[i] || ''));
+              const isPokedex = isPokedexUnlock(desc);
               return (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'flex-start', gap: 10,
@@ -407,12 +392,12 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
                   background: isPokedex ? 'rgba(91,156,246,0.06)' : 'var(--card-inner)',
                   border: isPokedex ? '1px solid rgba(91,156,246,0.25)' : '1px solid transparent',
                 }}>
-                  <FruitTag name={item.label} size={40} showName={false} />
+                  <FruitTag name={fruit} size={40} showName={false} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 2 }}>
-                      {item.label}
+                      {fruit}
                     </div>
-                    {item.desc ? (
+                    {desc ? (
                       <>
                         {isPokedex && (
                           <div style={{
@@ -426,7 +411,7 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
                           </div>
                         )}
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                          {item.desc}
+                          {desc}
                         </div>
                       </>
                     ) : (

@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 
 const getModalRoot = () => document.getElementById('modal-root') || document.body;
+const base = import.meta.env.BASE_URL;
 
 export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
   return createPortal(
@@ -40,7 +41,7 @@ export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
 
           <button className="modal-option modal-option--grid" onClick={() => onResult('original')}>
-            <span className="modal-option-icon">🟢</span>
+            <img src={`${base}icon-original.webp`} alt="原色精灵" className="modal-option-icon" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>原色精灵</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>精灵恢复正常形态</div>
@@ -48,7 +49,7 @@ export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
           </button>
 
           <button className="modal-option modal-option--grid" onClick={() => onResult('polluted')}>
-            <span className="modal-option-icon">🟣</span>
+            <img src={`${base}icon-polluted.webp`} alt="污染血脉" className="modal-option-icon" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>污染血脉</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>带有紫色污染血脉</div>
@@ -56,7 +57,7 @@ export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
           </button>
 
           <button className="modal-option modal-option--grid" onClick={() => onResult('shiny_blood')}>
-            <span className="modal-option-icon">💜</span>
+            <img src={`${base}icon-shiny-blood.webp`} alt="奇异血脉" className="modal-option-icon" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>奇异血脉</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>出现奇异形态血脉</div>
@@ -64,7 +65,7 @@ export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
           </button>
 
           <button className="modal-option modal-option--grid" onClick={() => onResult('mixed_blood')}>
-            <span className="modal-option-icon">🔮</span>
+            <img src={`${base}icon-mixed-blood.webp`} alt="混血血脉" className="modal-option-icon" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, color: 'var(--text)' }}>混血血脉</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>出现混合血脉形态</div>
@@ -76,7 +77,7 @@ export default function ResultModal({ onResult, onClose, hasTabBar = true }) {
             onClick={() => onResult('shiny')}
             style={{ borderColor: '#C8A020', background: '#FFF9E0', boxShadow: '0 2px 0 #C8A020' }}
           >
-            <span className="modal-option-icon">✨</span>
+            <img src={`${base}icon-shiny.webp`} alt="异色精灵" className="modal-option-icon" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <div>
               <div style={{ fontWeight: 800, fontSize: 13, color: '#C8830A' }}>异色精灵！</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>稀有配色精灵出现</div>

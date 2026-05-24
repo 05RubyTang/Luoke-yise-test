@@ -1,5 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, useMemo, useRef, useState } from 'react';
-import { ALL_SHINIES, classifyPool, computePoolCounts, PLANS, resolveShinyKey, FRUIT_ATTR, getAttrByAnyName, getPlanFruitsArray } from './data/plans';
+import { ALL_SHINIES, classifyPool, computePoolCounts, PLANS, resolveShinyKey, FRUIT_ATTR, getAttrByAnyName, getPlanFruitsArray, inferSpiritSeason, inferPlanSeason } from './data/plans';
 import { DEFAULT_SEASON } from './data/seasons';
 import { supabase } from './supabase';
 
@@ -21,7 +21,9 @@ const DEVICE_ID = (() => {
 // ─── 确保 localStorage 里始终有用户名（App 启动时立即执行）───────────────────
 function ensureUsername() {
   if (!localStorage.getItem(USERNAME_KEY)) {
-    const suffix = Math.floor(1000 + Math.random() * 9000);
+    // 用设备 ID 前 6 位（十六进制）作为后缀，约 1600 万种组合，几乎不重名
+    // DEVICE_ID 在本函数调用前已初始化（见上方），可直接引用
+    const suffix = DEVICE_ID.replace(/-/g, '').slice(0, 6).toUpperCase();
     localStorage.setItem(USERNAME_KEY, `小洛克${suffix}`);
   }
 }
@@ -83,12 +85,83 @@ function migrateLegacyData(state) {
     return { ...task, season: 'S1' };
   });
 
+  // userPlanConfig：补 season 字段（按 shinies 多数派推断，推断失败的方案 season 置 null，让用户手动选）
+  const userPlanConfig = (state.userPlanConfig || []).map(plan => {
+    if (plan.season) return plan; // 已有 season（包括 null 显式标记）→ 跳过
+    const inferred = inferPlanSeason(plan);
+    changed = true;
+    return { ...plan, season: inferred };
+  });
+
   // 标记迁移完成（幂等保障）
   return {
     ...state,
     activeTasks,
     completedTasks,
+    userPlanConfig,
     _migratedToSeasons: true,
+  };
+}
+
+// ─── 存量出货记录赛季修正：按出货精灵重新推断 season ─────────────────────────────
+// 触发条件：_migratedResultSeasons 不为 true（与 _migratedToSeasons 独立，分批迁移）
+// 策略：遍历 completedTasks，凡有 resultSpirit 的记录，用 inferSpiritSeason 重新推断 season。
+//   - S2 精灵 → 'S2'；S1/未知精灵 → 'S1'
+//   - 无 resultSpirit 的记录（手动补录等）保持原值不变
+// 幂等：再次运行结果不变（推断结果确定性）
+// 适用场景：
+//   - 旧自定义方案记录 season=false / 'S1' 但出的是 S2 精灵
+//   - 旧内置方案记录 season 继承 task.season 而非出货精灵赛季
+function migrateResultSeasons(state) {
+  if (state._migratedResultSeasons) return state;
+
+  const completedTasks = (state.completedTasks || []).map(task => {
+    if (!task.resultSpirit) return task; // 无出货精灵名，保持原值
+    const inferred = inferSpiritSeason(task.resultSpirit);
+    if (!inferred) return task;          // 推断失败（空名），保持原值
+    return { ...task, season: inferred };
+  });
+
+  return {
+    ...state,
+    completedTasks,
+    _migratedResultSeasons: true,
+  };
+}
+
+// ─── 存量 shieldBreak pool 字段修正 ───────────────────────────────────────────
+// 背景：早期 analyzePlanFruits 未读 plan.attrA/B，自定义方案果实属性推断失败，
+//       导致 RECORD_BREAK 时 classifyPool 返回 'world'，pool 字段被固化写错。
+// 策略：仅对自定义方案（plan.custom=true）的 shieldBreaks 做修正；
+//         有 spiritName 且 pool 有值时，用 classifyPool 重新推断，若不一致则覆盖；
+//         无 spiritName / 无 pool 的记录不做处理（无法重推，保持原状）。
+// 幂等：同一 break 重推结果确定，重复执行结果不变。
+// 触发条件：_migratedBreakPools 不为 true（独立 flag，一次性执行）
+function migrateBreakPools(state) {
+  if (state._migratedBreakPools) return state;
+
+  // 合并内置方案 + 用户自定义方案
+  const allPlans = [...(PLANS || []), ...(state.userPlanConfig || [])];
+
+  const fixBreaks = (task) => {
+    const plan = allPlans.find(p => p.id === task.planId);
+    // 只修正自定义方案（内置方案 pool 推断一直正确）
+    if (!plan || !plan.custom) return task;
+    const newBreaks = (task.shieldBreaks || []).map(br => {
+      // 没有 spiritName 或没有写入 pool 的 break，无法重推，跳过
+      if (!br.spiritName || !br.pool) return br;
+      const correctPool = classifyPool(br.spiritName, plan);
+      if (!correctPool || correctPool === br.pool) return br;
+      return { ...br, pool: correctPool };
+    });
+    return { ...task, shieldBreaks: newBreaks };
+  };
+
+  return {
+    ...state,
+    activeTasks:   (state.activeTasks   || []).map(fixBreaks),
+    completedTasks: (state.completedTasks || []).map(fixBreaks),
+    _migratedBreakPools: true,
   };
 }
 
@@ -120,8 +193,9 @@ function getLocalState() {
           ...parsed.spirits,    // 旧精灵数据保留
         },
       };
-      // 数据迁移：为旧版 S1 数据补全 season 字段（幂等）
-      return migrateLegacyData(merged);
+      // 数据迁移：为旧版 S1 数据补全 season 字段（幂等）；再按出货精灵修正历史记录赛季；
+      // 再修正存量自定义方案 shieldBreak 的 pool 字段（早期 analyzePlanFruits 推断错误导致）
+      return migrateBreakPools(migrateResultSeasons(migrateLegacyData(merged)));
     }
   } catch {}
   return buildDefaultState();
@@ -130,6 +204,17 @@ function getLocalState() {
 // ─── 辅助：更新 activeTasks 中指定 planId 的任务 ─────────────────────────────
 function updateTask(tasks, planId, updater) {
   return tasks.map(t => t.planId === planId ? updater(t) : t);
+}
+
+// ─── 辅助：为撤销操作生成球数快照（浅拷贝数组即可，reducer 每次返回新对象）────
+function snapshotBalls(task) {
+  return {
+    ballMode: task.ballMode,
+    ballStart: task.ballStart,
+    ballStartByType: task.ballStartByType,
+    ballRestocks: [...(task.ballRestocks || [])],
+    pauseSegments: [...(task.pauseSegments || [])],
+  };
 }
 
 // ─── Reducer（保持不变）──────────────────────────────────────────────────────
@@ -156,6 +241,7 @@ function reducer(state, action) {
         ballStartByType: action.ballStartByType ?? null, // byType 模式 {adv,sea,att}
         ballRestocks: [],   // simple: [{amount,time}]  byType: [{adv,sea,att,time}]
         pauseSegments: [],  // 暂停计球历史段：simple [{consumed,time}] / byType [{adv,sea,att,time}]
+        ballHistory: [],    // 球数操作历史栈，最多保留 10 条快照，支持「撤销上一步」
         familyPool: 0,      // 家族池保底计数（绑定本任务，出货或完成后归零）
       };
       return {
@@ -239,6 +325,8 @@ function reducer(state, action) {
         ...state,
         activeTasks: updateTask(state.activeTasks, action.planId, task => ({
           ...task,
+          // 操作前压栈快照（最多保留 10 条）
+          ballHistory: [...(task.ballHistory || []).slice(-9), snapshotBalls(task)],
           ballMode: action.ballMode || 'simple',
           ballStart: action.ballMode === 'byType' ? null : (action.ballStart ?? null),
           ballStartByType: action.ballMode === 'byType' ? (action.ballStartByType ?? null) : null,
@@ -251,6 +339,8 @@ function reducer(state, action) {
         ...state,
         activeTasks: updateTask(state.activeTasks, action.planId, task => ({
           ...task,
+          // 操作前压栈快照
+          ballHistory: [...(task.ballHistory || []).slice(-9), snapshotBalls(task)],
           ballRestocks: [...(task.ballRestocks || []), task.ballMode === 'byType'
             // byType: { adv, sea, att, time }
             ? { adv: action.adv || 0, sea: action.sea || 0, att: action.att || 0, time: new Date().toISOString() }
@@ -291,6 +381,8 @@ function reducer(state, action) {
             : { consumed, time: new Date().toISOString() };
           return {
             ...task,
+            // 操作前压栈快照
+            ballHistory: [...(task.ballHistory || []).slice(-9), snapshotBalls(task)],
             // 重置为暂停时填入的当前球数，作为下段起点
             ballStart: task.ballMode === 'byType' ? null : (action.current ?? null),
             ballStartByType: task.ballMode === 'byType' ? (action.currentByType ?? null) : null,
@@ -306,11 +398,30 @@ function reducer(state, action) {
         ...state,
         activeTasks: updateTask(state.activeTasks, action.planId, task => ({
           ...task,
+          // 操作前压栈快照
+          ballHistory: [...(task.ballHistory || []).slice(-9), snapshotBalls(task)],
           ballStart: action.ballMode === 'byType' ? task.ballStart : (action.ballStart ?? task.ballStart),
           ballStartByType: action.ballMode === 'byType' ? (action.ballStartByType ?? task.ballStartByType) : task.ballStartByType,
         })),
       };
     }
+    // 撤销上一步球数操作：弹出 ballHistory 栈顶快照整体还原
+    case 'UNDO_BALL_OP': {
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, action.planId, task => {
+          const hist = task.ballHistory || [];
+          if (hist.length === 0) return task;
+          const prev = hist[hist.length - 1];
+          return {
+            ...task,
+            ...prev,
+            ballHistory: hist.slice(0, -1),
+          };
+        }),
+      };
+    }
+    // 保留旧 action 以兼容可能存在的旧数据/旧调用（实际 UI 已不再使用）
     case 'UNDO_BALL_RESTOCK': {
       return {
         ...state,
@@ -369,7 +480,7 @@ function reducer(state, action) {
       const completed = {
         id: task.id,
         planId: task.planId,
-        season: task.season || 'S1',                  // 继承 task 的赛季标记（兜底 S1）
+        season: inferSpiritSeason(action.spiritName) || task.season || 'S1',  // 按出货精灵推断赛季，兜底 task.season → 'S1'
         resultSpirit: action.spiritName,
         resultType: action.resultType || (action.isPool ? 'pool' : 'offpool'),
         shieldBreakCount: task.shieldBreakCount,
@@ -445,26 +556,27 @@ function reducer(state, action) {
       }
       // 提前声明，completed 快照和 activeTask 过滤均需要
       const resetBreaks = !!action.resetBreaks;
-      // 选择性清零：只移除出货池（action.resultType）的 breaks，另外两池进度保留。
-      // resetBreaks=true（用户手动选择「三池全清」）时清空全部。
+      // 出货池类型（用于计算 offset）
       const poolToClear = action.resultType; // 'family' | 'attr' | 'world'
 
-      // ── completedTask 快照的 shieldBreaks 存储策略 ──────────────────────────
-      // 两层设计：任务快照 vs 实时各池（computePoolCounts）
-      //   - COMPLETE_TASK（正常结束）：全量存储，无双计风险（activeTask 已移除）
-      //   - COMPLETE_AND_CONTINUE + resetBreaks=true（全清继续）：全量存储，activeTask 被清空无双计风险
-      //   - COMPLETE_AND_CONTINUE + resetBreaks=false（选择性清零继续）：
-      //       只存出货池（poolToClear）的 breaks，其余池 breaks 已继承到新 activeTask。
-      //       若全量存储，computePoolCounts 会对世界池/属性池 breaks 双计。
-      const completedShieldBreaks = resetBreaks
-        ? (task.shieldBreaks || [])          // 全清模式：快照完整保留（无继承，无双计）
-        : (task.shieldBreaks || []).filter(b => !b.pool || b.pool === poolToClear);
-                                              // 选择性清零：只保留出货池 breaks，其余已在新 activeTask
+      // 实时推断 break 所属池（有 spiritName 就重新算，忽略存量 pool 字段，修复存量数据误判）
+      const cacPlan = PLANS.find(p => p.id === action.planId)
+        || (state.userPlanConfig || []).find(p => p.id === action.planId);
+      const deriveBreakPool = (b) =>
+        b.spiritName ? classifyPool(b.spiritName, cacPlan) : (b.pool || 'world');
+
+      // ── completedTask 快照的 shieldBreaks 存储策略（新方案）──────────────────
+      // 无论 resetBreaks 是否为 true，都将全量 shieldBreaks 存入 completedTask。
+      // hasContinuation=true 会让 computePoolCounts 跳过该 task 的 breaks，
+      // 避免与 activeTask 的全量 breaks 产生双计。
+      // 好处：completedTask 保留了完整的奇遇记录，可供历史查阅；
+      //       ShieldDots 展示数据完全依赖 activeTask.shieldBreaks，全量保留后显示不受影响。
+      const completedShieldBreaks = task.shieldBreaks || [];
 
       const completed = {
         id: task.id,
         planId: task.planId,
-        season: task.season || 'S1',                  // 继承 task 的赛季标记（兜底 S1）
+        season: inferSpiritSeason(action.spiritName) || task.season || 'S1',  // 按出货精灵推断赛季，兜底 task.season → 'S1'
         resultSpirit: action.spiritName,
         resultType: action.resultType || (action.isPool ? 'pool' : 'offpool'),
         shieldBreakCount: task.shieldBreakCount,
@@ -474,7 +586,7 @@ function reducer(state, action) {
         ballsUsed: cac_ballsUsed,
         ...(cac_ballsUsedByType ? { ballsUsedByType: cac_ballsUsedByType } : {}),
         completedAt: new Date().toISOString(),
-        hasContinuation: true, // 此任务「继续刷」：computePoolCounts 跳过其 breaks 避免双计（双重保障）
+        hasContinuation: true, // 此任务「继续刷」：computePoolCounts 跳过其 breaks 避免双计
       };
       const newSpirits = { ...state.spirits };
       // 图鉴点亮放宽：归一化到家族代表异色名
@@ -486,11 +598,35 @@ function reducer(state, action) {
           obtainedAt: new Date().toISOString(),
         };
       }
-      const nextShieldBreaks = resetBreaks
-        ? []
-        : task.shieldBreaks.filter(b => !b.pool || b.pool !== poolToClear);
-      // shieldBreakCount 从剩余 breaks 重新计算（jelly/failed 不占保底序号）
+
+      // ── 新 activeTask 的 shieldBreaks（全量保留）+ poolBreakOffsets ──────────
+      // resetBreaks=true（三池全清）：breaks 清空，offset 也归零（清空即归零，无需 offset）
+      // resetBreaks=false（选择性继续）：
+      //   - breaks 全量保留（保证 ShieldDots 显示不变，奇遇记录完整）
+      //   - 计算出货池当前已有多少条 break（排除 shiny/failed），写入 offset
+      //   - Recorder.jsx 三池进度计算时减去 offset，实现进度归零而不影响显示
+      const nextShieldBreaks = resetBreaks ? [] : [...(task.shieldBreaks || [])];
+      // shieldBreakCount：全量 breaks 中非 jelly 的条数（保留完整历史序号）
       const nextShieldBreakCount = nextShieldBreaks.filter(b => b.result !== 'jelly').length;
+
+      // 计算出货池当前（归零前）拥有多少条有效 break（shiny/failed 不计入池进度）
+      const clearedPoolBreakCount = resetBreaks ? 0 : (task.shieldBreaks || []).filter(b => {
+        if (b.result === 'shiny' || b.result === 'failed') return false;
+        return deriveBreakPool(b) === poolToClear;
+      }).length;
+      // 池 key 映射
+      const poolOffsetKey = poolToClear === 'world' ? 'world'
+        : poolToClear === 'attr' ? 'attr'
+        : 'family';
+      // 叠加到已有 offset（支持多次出货连续继续刷）
+      const prevOffsets = task.poolBreakOffsets || { family: 0, attr: 0, world: 0 };
+      const nextPoolBreakOffsets = resetBreaks
+        ? { family: 0, attr: 0, world: 0 }
+        : {
+            ...prevOffsets,
+            [poolOffsetKey]: (prevOffsets[poolOffsetKey] || 0) + clearedPoolBreakCount,
+          };
+
       return {
         ...state,
         spirits: newSpirits,
@@ -506,7 +642,8 @@ function reducer(state, action) {
           ballStartByType: task.ballMode === 'byType' ? nextBallStartByType : null,
           ballRestocks: [],
           pauseSegments: [],
-          // 各池进度：出货池已通过过滤 nextShieldBreaks 归零，另外两池 breaks 保留自然延续
+          // 出货池进度归零 offset（Recorder.jsx 三池进度计算时减去此值）
+          poolBreakOffsets: nextPoolBreakOffsets,
         })),
         completedTasks: [completed, ...state.completedTasks],
       };
@@ -804,6 +941,7 @@ function reducer(state, action) {
     // 触发时机：userPlanConfig 变化时（启动、hydrate 合并、新增/删除方案均会触发）。
     // 完全幂等：已在 customFruits 中的果实（含 deleted 墓碑）会被跳过，不重复写入。
     // 内置果实（FRUIT_ATTR 命中）也跳过——保护内置数据不被自建条目覆盖。
+    // 支持 3+ 果实方案：优先读 plan.fruits[]，兼容旧 fruitA/fruitB 字段。
     case 'RECONCILE_CUSTOM_FRUITS': {
       const existingFruitNames = new Set(
         (state.customFruits || []).map(c => c.fruit)
@@ -814,7 +952,9 @@ function reducer(state, action) {
       (state.userPlanConfig || [])
         .filter(p => !p.deleted)
         .forEach(plan => {
-          [plan.fruitA, plan.fruitB].forEach(fruitName => {
+          // 用 getPlanFruitsArray 读取全部果实（支持 3+ 个自定义果实）
+          getPlanFruitsArray(plan).forEach(f => {
+            const fruitName = f.fruit;
             if (!fruitName) return;
             // 内置果实不建自建条目
             if (Object.prototype.hasOwnProperty.call(FRUIT_ATTR, fruitName)) return;
@@ -826,7 +966,7 @@ function reducer(state, action) {
             const attrId = getAttrByAnyName(fruitName) || null;
             toAdd.push({
               fruit: fruitName,
-              spirit: fruitName.endsWith('果实') ? fruitName.slice(0, -2) : fruitName,
+              spirit: f.spirit || (fruitName.endsWith('果实') ? fruitName.slice(0, -2) : fruitName),
               attrs: [],       // customFruitToEntry 会按 attrId 自动补全中文属性名
               attrId,
               unlock: '自定义',
@@ -1253,7 +1393,7 @@ async function hydrateFromCloud(uid, dispatch, localFallback, overwriteUserMeta 
       ...mergedRaw,
       completedTasks: (mergedRaw.completedTasks || []).filter(t => t.resultType !== 'abandoned'),
     };
-    const merged = migrateLegacyData(mergedFiltered);
+    const merged = migrateBreakPools(migrateResultSeasons(migrateLegacyData(mergedFiltered)));
     dispatch({ type: '_HYDRATE_FROM_CLOUD', data: merged });
     // 把合并结果写到新 uid 下（data 列精简，completed_tasks_full 列存完整 shieldBreaks）
     try {

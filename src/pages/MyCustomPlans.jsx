@@ -243,11 +243,26 @@ export default function MyCustomPlans({ goBack, navigate }) {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* 方案名：优先用 label，兜底 type */}
                   <div style={{
-                    fontSize: 15, fontWeight: 900, color: '#2B2A2E',
-                    fontFamily: 'var(--font-display)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    overflow: 'hidden',
                   }}>
-                    {plan.label || plan.type || '自定义方案'}
+                    <span style={{
+                      fontSize: 15, fontWeight: 900, color: '#2B2A2E',
+                      fontFamily: 'var(--font-display)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {plan.label || plan.type || '自定义方案'}
+                    </span>
+                    {/* 赛季徽章 */}
+                    {plan.season && (
+                      <span style={{
+                        flexShrink: 0,
+                        fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 8,
+                        background: plan.season === 'S2' ? 'rgba(126,87,194,0.12)' : 'rgba(91,156,246,0.12)',
+                        color: plan.season === 'S2' ? '#7E57C2' : '#5B9CF6',
+                        border: `1px solid ${plan.season === 'S2' ? 'rgba(126,87,194,0.3)' : 'rgba(91,156,246,0.3)'}`,
+                      }}>{plan.season}</span>
+                    )}
                   </div>
                   {/* 果实信息 + 未集齐标记 */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, marginBottom: 1, flexWrap: 'wrap' }}>

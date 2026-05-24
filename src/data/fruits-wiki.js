@@ -30,7 +30,7 @@ export const FRUITS_WIKI_IMG = {
   "小独角兽果实": "https://patchwiki.biligame.com/images/rocom/4/4e/jzb1butqad19cd2grife4yzab1el3l8.png",
   "幽影树果实": "https://patchwiki.biligame.com/images/rocom/6/63/ti0cy2f8p0dkbbs91qnsxghe87717ee.png",
   "忽幽狸果实": "https://patchwiki.biligame.com/images/rocom/9/94/ejtoip8us81qxm7bkk05yc7lyh9pkpw.png",
-  "锤头鹳果实": "https://patchwiki.biligame.com/images/rocom/5/50/gt62wb7ozhzraaf1dcmt2c3dxgtqcy9.png",
+  "锤头鹳果实": "https://patchwiki.biligame.com/images/rocom/0/00/gt62wb7ozhzraaf1dcmt2c3dxgtqcy9.png",
   "护主犬果实": "https://patchwiki.biligame.com/images/rocom/f/f9/8w3369gfh6yb0iu7age04qynb4ri0gk.png",
   "格兰种子果实": "https://patchwiki.biligame.com/images/rocom/1/14/2pw4lxtilty0fg49he2uu65cdler006.png",
   "灵狐果实": "https://patchwiki.biligame.com/images/rocom/7/7f/pa3zm1znhxejbmvskbjhojmsnhad9pl.png",
@@ -154,9 +154,7 @@ export const FRUITS_WIKI_IMG = {
   "火焰猿果实":   "https://patchwiki.biligame.com/images/rocom/c/c6/mqkzqm1sqkemx7y6mnqvlzufmrzafgh.png", // 同家族：可爱猿果实
   "尖嘴狐仙果实": "https://patchwiki.biligame.com/images/rocom/7/7f/pa3zm1znhxejbmvskbjhojmsnhad9pl.png", // 同家族：灵狐果实
 
-  // 翼系（锤头系同家族）
-  "锤头鹤果实":   "https://patchwiki.biligame.com/images/rocom/5/50/gt62wb7ozhzraaf1dcmt2c3dxgtqcy9.png", // 同家族：锤头鹳果实
-
+  // 翼系
   // 草系
   "奇丽花果实":   "https://patchwiki.biligame.com/images/rocom/9/99/c3dihkk998rj261t9pzm8cq7voaoiin.png", // 同家族：奇丽草果实
   "蹦跳花果实":   "https://patchwiki.biligame.com/images/rocom/6/6e/a0ysaz4or3jvrzc7r0jqr3hgjwjvmmv.png", // 同家族：蹦蹦种子果实
@@ -175,6 +173,7 @@ export const FRUITS_WIKI_IMG = {
 
   // 水系
   "彩蝶鲨果实":   "https://patchwiki.biligame.com/images/rocom/6/65/hydlfshvlv7pp7drmrd59b8rdlxavk1.png", // 同家族：风铃鲨果实
+  "水泡壳果实":   "https://patchwiki.biligame.com/images/rocom/e/e9/krtpc3nql9f06w97vbz75fxekpmtw5d.png", // 即板板壳果实（同名别称）
 
   // 恶系
   "乌拉怪果实":   "https://patchwiki.biligame.com/images/rocom/9/92/71uio6chmmg26u55xgt9nv7c8qnq88b.png", // 同家族：小箱怪果实

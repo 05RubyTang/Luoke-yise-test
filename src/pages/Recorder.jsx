@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS, S2_PLANS, classifyResultType, getPlanAttrId, computeFamilyPool, resolvePlanIconImg, ATTR_LABEL, ALL_SHINIES, analyzePlanFruits, SPIRIT_ATTR1 } from '../data/plans';
+import { PLANS, S2_PLANS, classifyResultType, getPlanAttrId, computeFamilyPool, resolvePlanIconImg, ATTR_LABEL, ALL_SHINIES, analyzePlanFruits, SPIRIT_ATTR1, getPlanFruitsArray } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import { FruitLine } from '../components/FruitTag';
@@ -278,7 +278,7 @@ export default function Recorder({ planId, navigate }) {
                 fontSize: 17, fontWeight: 900, color: '#fff',
                 fontFamily: 'var(--font-display)', letterSpacing: 0.5, lineHeight: 1.2,
               }}>
-                {plan.season ? `${plan.type}刷取方案` : plan.shinies.length > 0 ? '3+3 刷取方案' : `${plan.type}`}
+                {plan.season ? `${plan.type}刷取方案` : `${plan.type}方案`}
               </div>
               {plan.shinies.length > 0 && (
                 <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2, fontWeight: 600 }}>
@@ -302,7 +302,7 @@ export default function Recorder({ planId, navigate }) {
         {/* 正常内容区 */}
         <div style={{ padding: '12px 14px 22px' }}>
         <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 3 }}>
-          <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
+          <FruitLine fruits={getPlanFruitsArray(plan)} size={14} />
         </div>
         {plan.season ? (
           plan.sanctuary && (
@@ -311,12 +311,7 @@ export default function Recorder({ planId, navigate }) {
               {' '}「{plan.sanctuary}」
             </div>
           )
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--text-light)', marginBottom: 10 }}>
-            抓3只{plan.spiritA}
-            {plan.spiritB ? ` → 抓3只${plan.spiritB} → 循环` : ' → 每3只一轮'}
-          </div>
-        )}
+        ) : null}
         {/* 异色精灵解锁进度（有 shinies 时展示；自定义方案无 shinies 则提示手动记录） */}
         {plan.shinies.length > 0 ? (
           <>
@@ -761,35 +756,20 @@ export default function Recorder({ planId, navigate }) {
       {/* 触发污染色块（始终显示，0 条记录时显示空格子） */}
       <div className="card" style={{
         backgroundImage: `url(${import.meta.env.BASE_URL}card-breaks.webp)`,
-        backgroundSize: '100% auto',
-        backgroundRepeat: 'repeat-y',
-        backgroundPosition: 'top center',
+        backgroundSize: '100% 100%',
+        backgroundRepeat: 'no-repeat',
         backgroundColor: 'transparent',
         border: '0px',
         boxShadow: 'none',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <span className="font-subtitle" style={{ fontSize: 13, fontWeight: 800 }}>奇遇记录</span>
-          <div style={{ display: 'flex', gap: 8, fontSize: 11, fontWeight: 700, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            <span style={{ color: 'var(--success)' }}>
-              原色×{task.shieldBreaks.filter(b => b.result === 'original').length}
-            </span>
-            <span style={{ color: 'var(--polluted)' }}>
-              污染×{task.shieldBreaks.filter(b => b.result === 'polluted').length}
-            </span>
-            {task.shieldBreaks.some(b => b.result === 'shiny_blood') && (
-              <span style={{ color: '#9B59B6' }}>
-                奇异×{task.shieldBreaks.filter(b => b.result === 'shiny_blood').length}
-              </span>
-            )}
-            {task.shieldBreaks.some(b => b.result === 'mixed_blood') && (
-              <span style={{ color: '#5B6DF6' }}>
-                混血×{task.shieldBreaks.filter(b => b.result === 'mixed_blood').length}
-              </span>
-            )}
-            <span style={{ color: 'var(--gold)' }}>
-              异色×{task.shieldBreaks.filter(b => b.result === 'shiny').length}
-            </span>
+        <div style={{ marginBottom: 10 }}>
+          <span className="font-subtitle" style={{ fontSize: 13, fontWeight: 800, display: 'block', marginBottom: 4 }}>奇遇记录</span>
+          <div style={{ display: 'flex', gap: 6, fontSize: 11, fontWeight: 700, flexWrap: 'wrap' }}>
+            <span style={{ color: 'var(--success)' }}>原色×{task.shieldBreaks.filter(b => b.result === 'original').length}</span>
+            <span style={{ color: 'var(--polluted)' }}>污染×{task.shieldBreaks.filter(b => b.result === 'polluted').length}</span>
+            <span style={{ color: '#0BAF8A' }}>奇异×{task.shieldBreaks.filter(b => b.result === 'shiny_blood').length}</span>
+            <span style={{ color: '#5B6DF6' }}>混血×{task.shieldBreaks.filter(b => b.result === 'mixed_blood').length}</span>
+            <span style={{ color: 'var(--text-muted)' }}>果冻&虫×{task.shieldBreaks.filter(b => b.result === 'jelly').length}</span>
           </div>
         </div>
         <ShieldDots breaks={task.shieldBreaks} max={100} />
@@ -798,7 +778,7 @@ export default function Recorder({ planId, navigate }) {
       {/* ── 双列卡：保底进度 + 咕噜球 ── */}
       <div style={{ display: 'flex', gap: 10, padding: '0 16px', marginBottom: 0 }}>
 
-        {/* 左：本轮污染数小卡 */}
+        {/* 左：本轮奇遇数小卡 */}
         <div style={{
           flex: '1 1 0',
           background: 'var(--card)',
@@ -808,18 +788,23 @@ export default function Recorder({ planId, navigate }) {
           display: 'flex', flexDirection: 'column',
         }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', letterSpacing: 0.3, marginBottom: 6 }}>
-            本轮污染数
+            本轮奇遇数
           </div>
-          {/* 大数字 */}
+          {/* 大数字（含果冻&虫，不含触发失败） */}
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 2, marginBottom: 6 }}>
             <span className="font-subtitle" style={{
               fontSize: 34, fontWeight: 900, lineHeight: 1,
               color: progressColor,
-            }}>{task.shieldBreakCount}</span>
+            }}>{task.shieldBreaks.filter(b => b.result !== 'failed').length}</span>
           </div>
           {/* 细节行 */}
           <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.7 }}>
             <div>每次 1.8% 概率出异色</div>
+            {task.shieldBreaks.some(b => b.result === 'jelly') && (
+              <div style={{ color: 'var(--text-muted)' }}>
+                含果冻&虫 {task.shieldBreaks.filter(b => b.result === 'jelly').length} 次（不占保底）
+              </div>
+            )}
           </div>
         </div>
 
@@ -955,10 +940,10 @@ export default function Recorder({ planId, navigate }) {
                 </div>
               )}
 
-              {/* 撤销最近补球（有补球记录时） */}
-              {ballRestocks.length > 0 && (
+              {/* 撤销上一步球数操作（有历史记录时显示） */}
+              {(task.ballHistory?.length > 0) && (
                 <button
-                  onClick={() => dispatch({ type: 'UNDO_BALL_RESTOCK', planId })}
+                  onClick={() => dispatch({ type: 'UNDO_BALL_OP', planId })}
                   style={{
                     marginTop: 8, alignSelf: 'flex-start',
                     fontSize: 9, fontWeight: 700, color: 'var(--text-muted)',
@@ -966,7 +951,7 @@ export default function Recorder({ planId, navigate }) {
                     borderRadius: 5, padding: '2px 7px', cursor: 'pointer',
                     fontFamily: 'var(--font-body)',
                   }}
-                >↩ 撤销</button>
+                >↩ 撤销上一步</button>
               )}
             </>
           ) : (
@@ -989,12 +974,28 @@ export default function Recorder({ planId, navigate }) {
         </div>
       </div>
 
-      {/* ── 三池实时进度仪表盘 ── */}
+      {/* ── 三池实时进度仪表盘（仅统计本方案内的 breaks，不跨方案累计） ── */}
       {(() => {
-        const attrId = getPlanAttrId(plan);
+        // 属系池 id：优先 getPlanAttrId；自定义方案额外兜底读 plan.attrA（buildPlan 写入的果实A属性id）
+        const attrId = getPlanAttrId(plan) || (plan.custom ? plan.attrA : null);
+        // computeFamilyPool 内部已处理 poolBreakOffsets.family offset
         const familyPool = computeFamilyPool(task, plan);
-        const worldPool = poolCounts?.worldPool || 0;
-        const attrPoolCount = attrId ? ((poolCounts?.attrPools || {})[attrId] || 0) : 0;
+        // 仅从本任务 shieldBreaks 派生，pool 字段缺失时用 spiritName 实时推断（与 computeFamilyPool 保持一致）
+        const taskBreaks = task.shieldBreaks || [];
+        // 有 spiritName 时总是实时重新推断（忽略存量 pool 字段，修复存量数据误判问题）
+        const derivePool = (br) => br.spiritName ? classifyResultType(br.spiritName, plan) : (br.pool || 'world');
+        // 「继续刷」offset：减去出货归零前的 break 数，让进度正确归零（breaks 全量保留供 ShieldDots 显示）
+        const offsets = task.poolBreakOffsets || { family: 0, attr: 0, world: 0 };
+        const worldPool = Math.max(0, taskBreaks.filter(br => {
+          if (br.result === 'shiny' || br.result === 'failed') return false;
+          return derivePool(br) === 'world';
+        }).length - (offsets.world || 0));
+        const attrPoolCount = attrId
+          ? Math.max(0, taskBreaks.filter(br => {
+              if (br.result === 'shiny' || br.result === 'failed') return false;
+              return derivePool(br) === 'attr';
+            }).length - (offsets.attr || 0))
+          : 0;
 
         // attrId → 中文属性名（系别池标签固定用「x系池」，与方案/精灵名无关）
         const ATTR_LABEL = {
@@ -1013,24 +1014,30 @@ export default function Recorder({ planId, navigate }) {
         const isForceWorld = !!plan.forceWorld;
 
         // 判断当前方案是否有家族池保底：
-        // spiritA 在任意方案的 shinies 列表中，说明系统登记了该精灵的家族池
+        // 内置方案：spiritA 在任意方案的 shinies 列表中，说明系统登记了该精灵的家族池
+        // 自定义方案：用户在 shinies 里填了精灵名 → 认为有家族池（用户主动指定了目标精灵）
         const spiritAName = plan.spiritA || '';
         const spiritBName = plan.spiritB || '';
-        const hasFamilyPool = spiritAName
-          ? (ALL_SHINIES.includes(spiritAName) || ALL_SHINIES.some(k => k.includes(spiritAName) || spiritAName.includes(k)))
-          : plan.shinies?.length > 0;
+        const hasFamilyPool = plan.custom
+          ? (plan.shinies?.length > 0)  // 自定义方案：有目标精灵即视为有家族池
+          : (spiritAName
+              ? (ALL_SHINIES.includes(spiritAName) || ALL_SHINIES.some(k => k.includes(spiritAName) || spiritAName.includes(k)))
+              : plan.shinies?.length > 0);
         // spiritB 同理（若存在）
-        const spiritBInPool = spiritBName
-          ? (ALL_SHINIES.includes(spiritBName) || ALL_SHINIES.some(k => k.includes(spiritBName) || spiritBName.includes(k)))
-          : false;
+        const spiritBInPool = plan.custom
+          ? false  // 自定义方案 spiritB 的家族池已由 hasFamilyPool（shinies.length > 0）整体判断
+          : (spiritBName
+              ? (ALL_SHINIES.includes(spiritBName) || ALL_SHINIES.some(k => k.includes(spiritBName) || spiritBName.includes(k)))
+              : false);
         const showFamilyPool = !isForceWorld && (hasFamilyPool || spiritBInPool || plan.shinies?.length > 0);
 
         // 无家族池时：根据果实属性判断精灵的出货池归属
         // fruitAttrId 有值 → 单果/同属混刷 → 精灵属性若与果实属性一致则归属系池，否则世界池
         // fruitAttrId 无值 → 跨属混刷 → 一律世界池
         const { fruitAttrId } = analyzePlanFruits(plan);
-        // 查询精灵A的第一属性（用于判断归属）
+        // 查询精灵A的第一属性（用于判断归属）：自定义方案直接用 plan.attrA（buildPlan 已推导），内置方案查 SPIRIT_ATTR1
         const spiritAttr1 = (() => {
+          if (plan.custom) return plan.attrA || null;
           const name = spiritAName;
           if (!name) return null;
           // 精确匹配
@@ -1115,14 +1122,27 @@ export default function Recorder({ planId, navigate }) {
                   </span>
                 </div>
               ))}
-              {!isForceWorld && attrId && (
+              {!isForceWorld && (attrId ? (
                 <MiniPoolRow
                   dotColor={plan.color || '#E8A020'}
                   label={`${ATTR_LABEL[attrId] || attrId}池`}
                   count={attrPoolCount}
                   limit={ATTR_LIMIT}
                 />
-              )}
+              ) : plan.custom ? (
+                /* 自定义世界池方案：属系池置灰提示 */
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{
+                    width: 7, height: 7, borderRadius: '50%',
+                    background: 'rgba(103,93,83,0.25)', flexShrink: 0, display: 'inline-block',
+                  }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'rgba(103,93,83,0.4)', flexShrink: 0, minWidth: 42 }}>属系池</span>
+                  <span style={{ fontSize: 9, color: 'rgba(103,93,83,0.45)', fontStyle: 'italic' }}>
+                    无保底 · 出货计入
+                    <span style={{ color: '#7E57C2', fontStyle: 'normal', fontWeight: 700 }}> 世界池</span>
+                  </span>
+                </div>
+              ) : null)}
               <MiniPoolRow
                 dotColor="#7E57C2"
                 label="世界池"
@@ -1195,17 +1215,24 @@ export default function Recorder({ planId, navigate }) {
         // 判断是否有家族池（与仪表盘保持一致，重新计算）
         const spiritAName = plan.spiritA || '';
         const spiritBName = plan.spiritB || '';
-        const hasFamilyPoolCard = spiritAName
-          ? (ALL_SHINIES.includes(spiritAName) || ALL_SHINIES.some(k => k.includes(spiritAName) || spiritAName.includes(k)))
-          : plan.shinies?.length > 0;
-        const spiritBInPoolCard = spiritBName
-          ? (ALL_SHINIES.includes(spiritBName) || ALL_SHINIES.some(k => k.includes(spiritBName) || spiritBName.includes(k)))
-          : false;
+        // 自定义方案：用户填了 shinies 即视为有家族池；内置方案查 ALL_SHINIES 注册表
+        const hasFamilyPoolCard = plan.custom
+          ? (plan.shinies?.length > 0)
+          : (spiritAName
+              ? (ALL_SHINIES.includes(spiritAName) || ALL_SHINIES.some(k => k.includes(spiritAName) || spiritAName.includes(k)))
+              : plan.shinies?.length > 0);
+        const spiritBInPoolCard = plan.custom
+          ? false
+          : (spiritBName
+              ? (ALL_SHINIES.includes(spiritBName) || ALL_SHINIES.some(k => k.includes(spiritBName) || spiritBName.includes(k)))
+              : false);
         const showFamilyPoolCard = hasFamilyPoolCard || spiritBInPoolCard || plan.shinies?.length > 0;
 
         // 无家族池时：判断精灵属性 vs 果实属性，确定出货归属
         const { fruitAttrId: fruitAttrIdCard } = analyzePlanFruits(plan);
+        // 自定义方案直接用 plan.attrA（buildPlan 写入的果实A属性id），内置方案查 SPIRIT_ATTR1
         const spiritAttr1Card = (() => {
+          if (plan.custom) return plan.attrA || null;
           const name = spiritAName;
           if (!name) return null;
           if (SPIRIT_ATTR1[name]) return SPIRIT_ATTR1[name];
@@ -1217,17 +1244,23 @@ export default function Recorder({ planId, navigate }) {
         const noFamilyGoesAttrCard = !showFamilyPoolCard && fruitAttrIdCard && spiritAttr1Card === fruitAttrIdCard;
         const noFamilyAttrLabelCard = fruitAttrIdCard ? (ATTR_LABEL[fruitAttrIdCard] || fruitAttrIdCard) : null;
 
+        // 家族池描述：自定义方案用 shinies 列表展示目标精灵，内置方案用 spiritA/spiritB
+        const familyCardSpiritDesc = plan.custom
+          ? (plan.shinies?.length > 0 ? plan.shinies.slice(0, 3).join('、') + (plan.shinies.length > 3 ? '等' : '') : '目标精灵')
+          : `${plan.spiritA || '对应精灵'}${plan.spiritB ? `或${plan.spiritB}` : ''}`;
         const familyCardConfig = showFamilyPoolCard
           ? {
               dot: '#C8830A', bg: '#FFF3CC', border: '#C8A020',
               label: '家族池',
-              rule: `放置${plan.spiritA || '对应精灵'}${plan.spiritB ? `或${plan.spiritB}` : ''}的果实，80次必出其异色`,
+              rule: `放置${familyCardSpiritDesc}的果实，80次必出其异色`,
               note: '出货后属性池&世界池计数不重置，可继续累积',
             }
           : {
               dot: 'rgba(103,93,83,0.3)', bg: 'rgba(103,93,83,0.04)', border: 'rgba(103,93,83,0.12)',
               label: '家族池',
-              rule: `${plan.spiritA || '当前精灵'}不在任意方案家族列表中，无家族池保底`,
+              rule: plan.custom
+                ? '自定义方案未填目标精灵，无家族池保底'
+                : `${plan.spiritA || '当前精灵'}不在任意方案家族列表中，无家族池保底`,
               note: noFamilyGoesAttrCard
                 ? `出货将计入${noFamilyAttrLabelCard}池（精灵属性与果实属性相符）`
                 : '出货将计入世界池（精灵属性与果实属性不符或跨属混刷）',

@@ -1,5 +1,5 @@
 import { useStore } from '../store';
-import { PLANS, getShinisByAttr } from '../data/plans';
+import { PLANS, getShinisByAttr, getPlanFruitsArray } from '../data/plans';
 import PlanCard from '../components/PlanCard';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -63,7 +63,7 @@ function UserPlanCard({ plan, spirits, onClick }) {
       {/* 内容区 */}
       <div style={{ padding: '12px 14px 10px' }}>
         <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 10 }}>
-          <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
+          <FruitLine fruits={getPlanFruitsArray(plan)} size={14} />
         </div>
 
         {shinies.length > 0 && (
@@ -224,7 +224,7 @@ export default function AttrPlanDetail({ planId, navigate, goBack }) {
                 <div style={{ padding: '10px 14px 12px' }}>
                   {/* 果实行 */}
                   <div style={{ fontSize: 11, color: 'var(--text-light)', marginBottom: 10 }}>
-                    <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={14} />
+                    <FruitLine fruits={getPlanFruitsArray(plan)} size={14} />
                   </div>
 
                   {/* 可产出异色精灵 */}

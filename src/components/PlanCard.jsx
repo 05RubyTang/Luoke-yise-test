@@ -1,6 +1,7 @@
 import SpiritAvatar from './SpiritAvatar';
 import PlanIcon from './PlanIcon';
 import { FruitLine } from './FruitTag';
+import { getPlanFruitsArray } from '../data/plans';
 
 // 计算某方案的平均出货（破盾次数均值），只统计非 abandoned 的成功记录
 function calcAvgBreaks(planId, completedTasks) {
@@ -77,7 +78,7 @@ export default function PlanCard({ plan, spirits, isActive, onClick, compact = f
         <div style={{
           fontSize: 10, color: 'var(--text-muted)', marginBottom: compact ? 6 : 8,
         }}>
-          <FruitLine fruitA={plan.fruitA} fruitB={plan.fruitB} size={compact ? 13 : 14} />
+          <FruitLine fruits={getPlanFruitsArray(plan)} size={compact ? 13 : 14} />
         </div>
 
         {/* 平均出货区（非 compact 才展示，赛季卡片太小不展示） */}

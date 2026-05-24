@@ -86,12 +86,17 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
     ? (task.ballStartByType != null || ballRestocks.length > 0)
     : (task.ballStart != null || ballRestocks.length > 0);
   const restockTotal = ballRestocks.reduce((s, r) => s + (r.amount || 0), 0);
-  const ballEnd = ballInput.trim() ? parseInt(ballInput.trim(), 10) : null;
+  // 注意：parseInt 返回 NaN 时（空字符串），ballEnd 为 null；ballEnd 可能为 0（球用完了）
+  const ballEndRaw = ballInput.trim() ? parseInt(ballInput.trim(), 10) : null;
+  const ballEnd = (ballEndRaw != null && !isNaN(ballEndRaw)) ? ballEndRaw : null;
   // 当前段消耗 + 历史暂停段消耗
-  const curSegUsed = (ballMode === 'simple' && hasBallStart && ballEnd != null && !isNaN(ballEnd))
+  const curSegUsed = (ballMode === 'simple' && hasBallStart && ballEnd != null)
     ? task.ballStart + restockTotal - ballEnd
     : null;
-  const ballsUsed = curSegUsed != null ? curSegUsed + pauseConsumedTotal : null;
+  // 与 reducer 保持一致：有暂停消耗时即使没填剩余球数也能展示暂停消耗小计
+  const ballsUsed = curSegUsed != null
+    ? curSegUsed + pauseConsumedTotal
+    : (pauseConsumedTotal > 0 ? pauseConsumedTotal : null);
 
   // byType 模式计算
   const bst = task.ballStartByType || { adv: 0, sea: 0, att: 0 };
@@ -136,8 +141,9 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
       dispatch({ type: 'COMPLETE_TASK', planId, spiritName, resultType,
         ballEndByType: hasByTypeEnd ? { adv: bet.adv ?? 0, sea: bet.sea ?? 0, att: bet.att ?? 0 } : null });
     } else {
+      // 注意：ballEnd 可能为 0（用完了），不能用 && 判断（0 是 falsy）
       dispatch({ type: 'COMPLETE_TASK', planId, spiritName, resultType,
-        ballEnd: (ballEnd && !isNaN(ballEnd)) ? ballEnd : null });
+        ballEnd: (ballEnd != null && !isNaN(ballEnd)) ? ballEnd : null });
     }
     navigate('history', { openTaskId: taskId });
   };
@@ -146,8 +152,9 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
       dispatch({ type: 'COMPLETE_AND_CONTINUE', planId, spiritName, resultType, resetBreaks,
         ballEndByType: hasByTypeEnd ? { adv: bet.adv ?? 0, sea: bet.sea ?? 0, att: bet.att ?? 0 } : null });
     } else {
+      // 注意：ballEnd 可能为 0（用完了），不能用 && 判断（0 是 falsy）
       dispatch({ type: 'COMPLETE_AND_CONTINUE', planId, spiritName, resultType, resetBreaks,
-        ballEnd: (ballEnd && !isNaN(ballEnd)) ? ballEnd : null });
+        ballEnd: (ballEnd != null && !isNaN(ballEnd)) ? ballEnd : null });
     }
     navigate('recorder', { planId });
   };
@@ -268,7 +275,7 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
                 <span style={{ color: 'var(--success)', fontSize: 11 }}>绿×{breakdowns.original}</span>
                 <span style={{ color: 'var(--polluted)', fontSize: 11 }}>紫×{breakdowns.polluted}</span>
                 {breakdowns.shiny_blood > 0 && (
-                  <span style={{ color: '#9B59B6', fontSize: 11 }}>奇×{breakdowns.shiny_blood}</span>
+                  <span style={{ color: '#0BAF8A', fontSize: 11 }}>奇×{breakdowns.shiny_blood}</span>
                 )}
                 {breakdowns.mixed_blood > 0 && (
                   <span style={{ color: '#5B6DF6', fontSize: 11 }}>混×{breakdowns.mixed_blood}</span>

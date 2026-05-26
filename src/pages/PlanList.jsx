@@ -3,6 +3,7 @@ import { useStore } from '../store';
 
 const base = import.meta.env.BASE_URL;
 import { PLANS, getShinisByAttr, getPlanFruitsArray } from '../data/plans';
+import { S2_PLANS } from '../data/seasons/s2Plans';
 import PlanCard from '../components/PlanCard';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -500,27 +501,50 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   const resetPickerTempFilters = () => { setPickerTempFruit('all'); setPickerTempAttr('all'); };
   const pickerActiveFilterCount = (pickerFruitFilter !== 'all' ? 1 : 0) + (pickerAttrFilter !== 'all' ? 1 : 0);
 
-  // ─── 按赛季筛选方案 ───────────────────────────────────────────────────────
-  // 判断是否为赛季奇遇方案：S1 用 season: true，S2 用 category: 'seasonal'
-  const isSeasonalPlan = (p) => p.season === true || p.category === 'seasonal';
+  // ─── 按赛季分发方案 ───────────────────────────────────────────────────────
+  // 解析任务有效赛季（与 Home.jsx resolveTaskSeason 逻辑一致）
+  const allBuiltinPlans = [...PLANS, ...S2_PLANS];
+  const resolveActiveSeason = (task) => {
+    const plan = allBuiltinPlans.find(p => p.id === task.planId)
+      || (state.userPlanConfig || []).find(p => p.id === task.planId);
+    if (plan?.season && plan.season !== true) return plan.season;
+    return task.season || null;
+  };
 
-  // 筛选当前赛季的方案
-  const currentSeasonPlans = PLANS.filter(p => p.season === currentSeason);
+  // 当前赛季过滤后的 activeTasks（用方案 season 优先，避免 task.season 历史写错）
+  const currentSeasonActiveTasks = (state.activeTasks || []).filter(t => {
+    if (!currentSeason) return true;
+    const effectiveSeason = resolveActiveSeason(t);
+    return !effectiveSeason || effectiveSeason === currentSeason;
+  });
 
-  // noShiny 且有 attrId 的方案归属父属系二级页，不在主列表独立展示
-  // worldPlan：跨属世界池方案，单独区块展示
-  const worldPlansList    = PLANS.filter(p => p.worldPlan);
-  const attrPlans         = PLANS.filter(p => !p.season && !p.singleSpirit && !(p.noShiny && p.attrId) && !p.worldPlan);
-  const seasonPlans       = PLANS.filter(p => p.season);
-  const singleSpiritPlans = PLANS.filter(p => p.singleSpirit);
+  // ─── 按 currentSeason 分发内置方案到各分类 ──────────────────────────────
+  // S1 方案字段约定：
+  //   worldPlan:true → 世界池混刷
+  //   season:true    → 单刷奇遇（S1 赛季奇遇）
+  //   singleSpirit:true → 单刷异色
+  //   其他            → 属性混抓
+  // S2 方案字段约定：
+  //   category:'attr' + forceWorld:true → 世界池混刷
+  //   category:'attr'                   → 属性混抓
+  //   category:'seasonal'               → 单刷奇遇
+  //   category:'single'                 → 单刷异色（含战令）
+  let worldPlansList, attrPlans, seasonPlans, singleSpiritPlans;
+  if (currentSeason === 'S1') {
+    worldPlansList    = PLANS.filter(p => p.worldPlan);
+    attrPlans         = PLANS.filter(p => !p.season && !p.singleSpirit && !(p.noShiny && p.attrId) && !p.worldPlan);
+    seasonPlans       = PLANS.filter(p => p.season === true);
+    singleSpiritPlans = PLANS.filter(p => p.singleSpirit);
+  } else {
+    // S2
+    worldPlansList    = S2_PLANS.filter(p => p.category === 'attr' && p.forceWorld);
+    attrPlans         = S2_PLANS.filter(p => p.category === 'attr' && !p.forceWorld);
+    seasonPlans       = S2_PLANS.filter(p => p.category === 'seasonal');
+    singleSpiritPlans = S2_PLANS.filter(p => p.category === 'single');
+  }
 
   // 已拥有果实
   const ownedFruits = state.ownedFruits || [];
-
-  // 当前赛季过滤后的 activeTasks（防止 S1 任务污染 S2 方案状态）
-  const currentSeasonActiveTasks = (state.activeTasks || []).filter(
-    t => !currentSeason || !t.season || t.season === currentSeason
-  );
 
   // 计算每类方案的状态 + 果实是否集齐
   const worldWithStatus = worldPlansList.map(p => ({
@@ -551,8 +575,11 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
   const doneCount   = allWithStatus.filter(x => x.status === 'done').length;
   const idleCount   = allWithStatus.filter(x => x.status === 'idle').length;
 
-  // 用户自定义方案
-  const userPlans = (state.userPlanConfig || []).filter(p => !p.deleted);
+  // 用户自定义方案（按赛季过滤：无 season 字段的老数据兼容性保留在当前 Tab 下）
+  const userPlans = (state.userPlanConfig || []).filter(p =>
+    !p.deleted &&
+    (!p.season || p.season === currentSeason)
+  );
 
   // 进行中的 planId（固定置顶，仅当前赛季）
   const activePlanIds = new Set(currentSeasonActiveTasks.map(t => t.planId));
@@ -612,10 +639,12 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
       return true;
     });
 
+    const pickerWorldWithStatus  = worldWithStatus;
     const pickerAttrWithStatus   = attrWithStatus;
     const pickerSeasonWithStatus = seasonWithStatus;
     const pickerSingleWithStatus = singleWithStatus;
 
+    const pickerFilteredWorld  = applyPickerFilters(pickerWorldWithStatus);
     const pickerFilteredAttr   = applyPickerFilters(pickerAttrWithStatus);
     const pickerFilteredSeason = applyPickerFilters(pickerSeasonWithStatus);
     const pickerFilteredSingle = applyPickerFilters(pickerSingleWithStatus);
@@ -623,8 +652,9 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
     const pickerFilteredUser   = applyPickerFilters(pickerUserPlansWithFruit).map(x => x.plan);
 
     const pickerNoResults = pickerActiveFilterCount > 0
-      && pickerFilteredAttr.length === 0 && pickerFilteredSeason.length === 0
-      && pickerFilteredSingle.length === 0 && pickerFilteredUser.length === 0;
+      && pickerFilteredWorld.length === 0 && pickerFilteredAttr.length === 0
+      && pickerFilteredSeason.length === 0 && pickerFilteredSingle.length === 0
+      && pickerFilteredUser.length === 0;
 
     return (
       <>
@@ -730,11 +760,35 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
           </button>
         </div>
 
+        {/* ── 世界池混刷 ── */}
+        {showWorldP && pickerFilteredWorld.length > 0 && (
+          <>
+            {pickerTab === 'all' && (
+              <div style={{ padding: '0 16px 7px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#7E57C2' }}>🌍 世界池混刷</span>
+              </div>
+            )}
+            <div style={{ padding: '0 16px' }}>
+              {pickerFilteredWorld.map(({ plan, fruitReady }) => (
+                <WorldPlanCard
+                  key={plan.id}
+                  plan={plan}
+                  spirits={state.spirits}
+                  completedTasks={state.completedTasks}
+                  activeTasks={currentSeasonActiveTasks}
+                  fruitReady={fruitReady}
+                  onClick={() => navigate('checklist', { planId: plan.id })}
+                />
+              ))}
+            </div>
+          </>
+        )}
+
         {/* ── 属性混抓 ── */}
         {showAttr && pickerFilteredAttr.length > 0 && (
           <>
             {pickerTab === 'all' && (
-              <div style={{ padding: `${showWorldP ? '8px' : '0'} 16px 7px`, fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>属性混抓</div>
+              <div style={{ padding: `${showWorldP && pickerFilteredWorld.length > 0 ? '8px' : '0'} 16px 7px`, fontSize: 12, fontWeight: 800, color: 'var(--text-muted)' }}>属性混抓</div>
             )}
             {pickerFilteredAttr.map(({ plan, fruitReady }) => (
               plan.noShiny ? (

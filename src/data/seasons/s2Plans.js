@@ -437,13 +437,13 @@ export const S2_PLANS = [
     note: '恶魔狼在 S2 无对应异色，进恶系池可产出小夜 / 小丑公爵异色',
   },
 
-  // 6. 混属系方案：恶魔狼果 + 月牙雪熊果（可刷除战令外所有 S2 异色）
+  // 6. 混属系方案 A：恶魔狼果 + 月牙雪熊果（可刷除战令外所有 S2 异色）
   // 注：恶魔狼/月牙雪熊是 S1 异色精灵，此处仅作为果实使用
   {
     id: 's2_attr_evil_bear_wolf',
     season: 'S2',
     category: 'attr',
-    type: '混属系',
+    type: '熊狼混刷',
     icon: '🌍',
     iconImg: null,
     forceWorld: true,
@@ -459,6 +459,29 @@ export const S2_PLANS = [
     unlockA: '待游戏更新后补充',
     unlockB: '待游戏更新后补充',
     note: '混属系混刷，可随机检索除战令精灵（雪怪/爆焰喷喷）以外的所有 S2 异色，概率较低但覆盖面最广',
+  },
+
+  // 6-B. 混属系方案 B：菊花梨果 + 公平鸽果（萌系 × 普通系，世界池）
+  {
+    id: 's2_attr_cute_normal_world',
+    season: 'S2',
+    category: 'attr',
+    type: '鸽梨混刷',
+    icon: '🌍',
+    iconImg: null,
+    forceWorld: true,
+    color: '#7E57C2',
+    fruitA: '菊花梨果实',
+    fruitB: '公平鸽果实',
+    spiritA: '菊花梨',
+    spiritB: '公平鸽',
+    shinies: [
+      '恶魔叮', '菊花梨', '公平鸽', '灵狐', '小夜', '小独角兽', '嘟嘟煲', '幽影树',
+      '小丑公爵', '小鼓象', '音碟吼', '烟花伯爵', '帅帅魔偶', '炫光迪迪', '加油海葵', '咕德帽帽',
+    ],
+    unlockA: '待游戏更新后补充',
+    unlockB: '待游戏更新后补充',
+    note: '萌系 × 普通系混刷，跨属进世界池，可随机检索除战令精灵以外的所有 S2 异色',
   },
 
   // 8. 翼系：恶魔叮（锤头鹳果单果，100% 检索恶魔叮）

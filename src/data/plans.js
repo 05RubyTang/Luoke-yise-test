@@ -399,14 +399,19 @@ export function analyzePlanFruits(plan) {
   // getPlanFruitsArray 已优先读 plan.fruits[]，兼容旧字段，支持任意数量果实
   const fruitEntries = getPlanFruitsArray(plan).filter(f => f && f.fruit);
   const isSingleFruit = fruitEntries.length <= 1;
-  // 属性识别：优先查内置 FRUIT_ATTR 字典；自定义方案果实名可能不在字典里，
-  // 此时兜底读 plan.attrA / plan.attrB（buildPlan 创建时由 getAttrByAnyName 推导写入）。
+  // 属性识别优先级：
+  //   1. 内置 FRUIT_ATTR 字典（精准）
+  //   2. 果实条目自带的 attr 字段（PlanEditor / buildPlan 保存时写入，支持 N 个果实）
+  //   3. 旧字段兜底：plan.attrA / plan.attrB（仅兼容 CustomChecklist 旧方案）
+  const LEGACY_ATTR = [plan.attrA, plan.attrB];
   const fruitAttrs = [...new Set(fruitEntries.map((f, i) => {
+    // 优先内置字典
     const fromDict = FRUIT_ATTR[f.fruit];
     if (fromDict) return fromDict;
-    // 兜底：自定义方案按位置读属性字段
-    if (i === 0 && plan.attrA) return plan.attrA;
-    if (i === 1 && plan.attrB) return plan.attrB;
+    // 次选：条目本身的 attr 字段（新方案由 PlanEditor/buildPlan 写入）
+    if (f.attr) return f.attr;
+    // 兜底：旧字段（CustomChecklist 老路径，最多 2 个）
+    if (LEGACY_ATTR[i]) return LEGACY_ATTR[i];
     return null;
   }).filter(Boolean))];
   const isSameAttr = fruitAttrs.length === 1;
@@ -428,11 +433,11 @@ export function analyzePlanFruits(plan) {
  *         - 不同属性 → world
  *      b. 出货精灵「无家族池」（非赛季/非注册精灵，自定义单刷场景）：
  *         - 直接跳过 family 判断，看果实属性是否与精灵属性匹配
- *         - 精灵属性与果实属性吻合 → attr
+ *         - 精灵属性与果实属性吻合 → attr（字典查不到则按 plan.custom 兜底归 attr）
  *         - 不吻合 → world
  *   2. 多种果实且全部同属性（同属混刷）：
- *      - 任何同属性精灵污染 → attr（无家族池！）
- *      - 其他 → world
+ *      - 内置精灵（SPIRIT_ATTR1 可查到）：同属精灵 → attr，不同属 → world
+ *      - 自定义精灵（字典查不到属性）：直接归 attr（方案已明确声明属系，无法反查只能信任）
  *   3. 多种果实且跨属性（跨属混刷）：
  *      - 全部 → world
  *
@@ -443,6 +448,8 @@ export function analyzePlanFruits(plan) {
  */
 export function classifyResultType(resultSpirit, plan) {
   if (!resultSpirit || !plan) return 'world';
+  // 果冻/星辰虫：固定归世界池，不参与三池推断（字典查不到属性会命中自定义兜底逻辑，必须前置排除）
+  if (resultSpirit === '果冻/星辰虫') return 'world';
   const { isSingleFruit, isSameAttr, fruitAttrId } = analyzePlanFruits(plan);
 
   if (isSingleFruit) {
@@ -460,15 +467,23 @@ export function classifyResultType(resultSpirit, plan) {
       const spiritAttr1 = lookupAttr(resultSpirit);
       const spiritAttr2 = lookupAttr2(resultSpirit);
       if (spiritAttr1 === fruitAttrId || spiritAttr2 === fruitAttrId) return 'attr';
+      // 自定义方案 + 自定义精灵（字典查不到属性）：
+      // 方案已通过 fruits[].attr 明确声明了属系，且精灵名无法从字典反查，
+      // 此时信任方案的属系声明，归入属系池
+      if (plan.custom && !spiritAttr1 && !spiritAttr2) return 'attr';
     }
     return 'world';
   }
 
   if (isSameAttr && fruitAttrId) {
-    // 同属混刷：没有家族池，任何同属精灵 → attr
+    // 同属混刷：没有家族池
     const spiritAttr1 = lookupAttr(resultSpirit);
     const spiritAttr2 = lookupAttr2(resultSpirit);
+    // 内置精灵：按属性精确判断
     if (spiritAttr1 === fruitAttrId || spiritAttr2 === fruitAttrId) return 'attr';
+    // 自定义精灵（字典查不到属性）：方案已声明属系，直接归属系池
+    if (!spiritAttr1 && !spiritAttr2) return 'attr';
+    // 内置精灵但属性不匹配：归世界池
     return 'world';
   }
 
@@ -689,11 +704,23 @@ export function resolveShinyKey(spiritName) {
  * @param {string} [season] - 当前赛季（'S1'|'S2'）
  * 返回：{ family: number, attrPools: { [attrId]: number }, worldPool: number }
  */
+// 解析任务的有效赛季：优先读方案的 season，兜底读 task.season。
+// 与 Home.jsx resolveTaskSeason 逻辑保持一致。
+function resolveTaskSeasonFromPlans(task, allPlans) {
+  const plan = (allPlans || []).find(p => p.id === task.planId);
+  if (plan?.season) return plan.season;
+  return task.season || null;
+}
+
 export function computePoolCounts(activeTasks, completedTasks, allPlans, season) {
   // 赛季过滤：只保留同赛季的已完成任务
+  // 用方案的 season 优先，避免 task.season 历史写错（如 S2 方案但 task.season='S1'）
   const relevantCompleted = (completedTasks || []).filter(t => {
     if (!t || t.resultType === 'abandoned') return false;
-    if (season && t.season && t.season !== season) return false;
+    if (season) {
+      const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
+      if (effectiveSeason && effectiveSeason !== season) return false;
+    }
     return true;
   });
 
@@ -743,12 +770,23 @@ export function computePoolCounts(activeTasks, completedTasks, allPlans, season)
     }
   };
 
-  // 进行中的任务（仅统计当前赛季，防止 S1 任务污染 S2 池子）
-  (activeTasks || []).filter(t => !season || !t.season || t.season === season).forEach(task => {
+  // 进行中的任务（仅统计当前赛季，防止跨赛季污染）
+  // 用方案的 season 优先于 task.season，避免历史数据写错导致 S2 任务被误过滤
+  (activeTasks || []).filter(t => {
+    if (!season) return true;
+    const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
+    return !effectiveSeason || effectiveSeason === season;
+  }).forEach(task => {
     const plan = allPlans.find(p => p.id === task.planId);
     const planAttrId = getPlanAttrId(plan);
+    // task.startTime 是本轮开始时间（COMPLETE_AND_CONTINUE 每次继续刷都会重置）。
+    // 「继续刷取」保留全量 shieldBreaks，startTime 之前的旧 breaks 属于上一轮已出货的轮次，
+    // 不应再计入全局保底进度（否则家族池出货继续刷后，attr/world 旧进度会被重复计入）。
+    const taskStart = task.startTime || null;
     let familyCount = 0;
     (task.shieldBreaks || []).forEach(br => {
+      // 早于本轮开始时间的旧 break 跳过（仅影响「继续刷」场景，首次任务无历史 break）
+      if (taskStart && br.time && br.time < taskStart) return;
       countBreak(br, plan, planAttrId, () => familyCount++);
     });
     if (familyCount > familyMax) familyMax = familyCount;

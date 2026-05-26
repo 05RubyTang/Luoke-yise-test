@@ -976,14 +976,21 @@ export default function Recorder({ planId, navigate }) {
 
       {/* ── 三池实时进度仪表盘（仅统计本方案内的 breaks，不跨方案累计） ── */}
       {(() => {
-        // 属系池 id：优先 getPlanAttrId；自定义方案额外兜底读 plan.attrA（buildPlan 写入的果实A属性id）
-        const attrId = getPlanAttrId(plan) || (plan.custom ? plan.attrA : null);
+        // 属系池 id：优先 getPlanAttrId；
+        // 兜底1：plan.fruits[0].attr（PlanEditor 新方案存入）
+        // 兜底2：plan.attrA（CustomChecklist 老方案兼容）
+        const attrId = getPlanAttrId(plan)
+          || (plan.fruits?.[0]?.attr ?? null)
+          || (plan.custom ? plan.attrA : null);
         // computeFamilyPool 内部已处理 poolBreakOffsets.family offset
         const familyPool = computeFamilyPool(task, plan);
         // 仅从本任务 shieldBreaks 派生，pool 字段缺失时用 spiritName 实时推断（与 computeFamilyPool 保持一致）
         const taskBreaks = task.shieldBreaks || [];
         // 有 spiritName 时总是实时重新推断（忽略存量 pool 字段，修复存量数据误判问题）
-        const derivePool = (br) => br.spiritName ? classifyResultType(br.spiritName, plan) : (br.pool || 'world');
+        const derivePool = (br) => {
+          if (br.result === 'jelly') return 'world'; // 果冻/星辰虫固定归世界池，不走 classifyResultType 重推
+          return br.spiritName ? classifyResultType(br.spiritName, plan) : (br.pool || 'world');
+        };
         // 「继续刷」offset：减去出货归零前的 break 数，让进度正确归零（breaks 全量保留供 ShieldDots 显示）
         const offsets = task.poolBreakOffsets || { family: 0, attr: 0, world: 0 };
         const worldPool = Math.max(0, taskBreaks.filter(br => {
@@ -1035,9 +1042,11 @@ export default function Recorder({ planId, navigate }) {
         // fruitAttrId 有值 → 单果/同属混刷 → 精灵属性若与果实属性一致则归属系池，否则世界池
         // fruitAttrId 无值 → 跨属混刷 → 一律世界池
         const { fruitAttrId } = analyzePlanFruits(plan);
-        // 查询精灵A的第一属性（用于判断归属）：自定义方案直接用 plan.attrA（buildPlan 已推导），内置方案查 SPIRIT_ATTR1
+        // 查询精灵A的第一属性（用于判断归属）：
+        //   自定义方案：优先 plan.fruits[0].attr（PlanEditor 新方案），兜底 plan.attrA（老方案兼容）
+        //   内置方案：查 SPIRIT_ATTR1
         const spiritAttr1 = (() => {
-          if (plan.custom) return plan.attrA || null;
+          if (plan.custom) return plan.fruits?.[0]?.attr || plan.attrA || null;
           const name = spiritAName;
           if (!name) return null;
           // 精确匹配
@@ -1230,9 +1239,10 @@ export default function Recorder({ planId, navigate }) {
 
         // 无家族池时：判断精灵属性 vs 果实属性，确定出货归属
         const { fruitAttrId: fruitAttrIdCard } = analyzePlanFruits(plan);
-        // 自定义方案直接用 plan.attrA（buildPlan 写入的果实A属性id），内置方案查 SPIRIT_ATTR1
+        // 自定义方案：优先 plan.fruits[0].attr（PlanEditor 新方案），兜底 plan.attrA（老方案兼容）
+        // 内置方案：查 SPIRIT_ATTR1
         const spiritAttr1Card = (() => {
-          if (plan.custom) return plan.attrA || null;
+          if (plan.custom) return plan.fruits?.[0]?.attr || plan.attrA || null;
           const name = spiritAName;
           if (!name) return null;
           if (SPIRIT_ATTR1[name]) return SPIRIT_ATTR1[name];

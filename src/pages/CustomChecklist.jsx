@@ -522,13 +522,22 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
     //   属性池方案 → 用 attrA（具体属性 id），让方案库/筛选按属性归类
     //   世界池方案 → 'custom'，不归入任一具体属性 tab
     const computedAttrId = poolKind === 'attr' ? (attrA || 'custom') : 'custom';
+
+    // 构造 fruits[]（带 attr），供新版 analyzePlanFruits 直接读取；同时保留旧字段双路兼容
+    const fruitsArr = [];
+    if (fa) fruitsArr.push({ fruit: fa, spirit: sa, attr: attrA || undefined });
+    if (fb) fruitsArr.push({ fruit: fb, spirit: sb || '', attr: attrB || undefined });
+
     return {
       id,
       attrId: computedAttrId,
       label: planLabel, type: planLabel,
+      // 新字段：fruits 数组（带 attr，供 analyzePlanFruits 直接读取）
+      fruits: fruitsArr,
+      // 旧字段保留（向后兼容）
       fruitA: fa, fruitB: fb, spiritA: sa, spiritB: sb, shinies,
-      attrA: attrA || null,   // 果实A的属系 id（用于出货池识别）
-      attrB: attrB || null,   // 果实B的属系 id
+      attrA: attrA || null,   // 果实A的属系 id（旧路兜底）
+      attrB: attrB || null,   // 果实B的属系 id（旧路兜底）
       // 是否为用户手动指定，便于后续判定/审计
       attrAManual: !!attrAManual,
       attrBManual: !!attrBManual,

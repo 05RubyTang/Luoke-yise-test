@@ -744,10 +744,12 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
   const initFruits = useMemo(() => {
     if (existingUserPlan) {
       const arr = getPlanFruitsArray(existingUserPlan);
-      if (arr.length > 0) return arr.map(f => ({ fruit: f.fruit || '', spirit: f.spirit || '', attrManual: null }));
+      // 编辑已有方案时：从保存的 f.attr 恢复手动指定的属性（attrManual）
+      if (arr.length > 0) return arr.map(f => ({ fruit: f.fruit || '', spirit: f.spirit || '', attrManual: f.attr || null }));
     }
     if (basePlan) {
       const arr = getPlanFruitsArray(basePlan);
+      // 基于内置方案新建时：内置果实通常有自动识别，attrManual 不需要预填
       if (arr.length > 0) return arr.map(f => ({ fruit: f.fruit || '', spirit: f.spirit || '', attrManual: null }));
     }
     return [{ fruit: '', spirit: '', attrManual: null }, { fruit: '', spirit: '', attrManual: null }];
@@ -860,22 +862,30 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
     // 过滤掉空槽
     const validFruits = fruits.filter(f => f.fruit?.trim() || f.spirit?.trim());
     const isForceWorld = attrId === 'world';
+    // 每个槽的 resolvedAttr：手动指定优先，兜底自动识别
+    const resolvedFruits = validFruits.map(f => ({
+      fruit:  f.fruit?.trim()  || '',
+      spirit: f.spirit?.trim() || '',
+      // attr：手动指定 > 自动识别（通过精灵名/果实名反查）
+      attr:   f.attrManual ?? getAttrByAnyName(f.fruit?.trim() || '') ?? undefined,
+    }));
+    // 从 resolvedFruits 推导 attrA / attrB（旧字段兼容）
     const plan = {
       id: existingUserPlan?.id || undefined,
       // 混池时 attrId 置 null，用 forceWorld 标记走世界池
       attrId: isForceWorld ? null : attrId,
       forceWorld: isForceWorld || undefined,
       label: label.trim() || `${isForceWorld ? '混池' : (currentAttr?.label || '自定义')}方案`,
-      // 新字段：fruits 数组
-      fruits: validFruits.map(f => ({
-        fruit:  f.fruit?.trim()  || '',
-        spirit: f.spirit?.trim() || '',
-      })),
-      // 兼容旧字段（取前两槽，供 Checklist / Recorder 等老代码读取）
-      fruitA:  validFruits[0]?.fruit?.trim()  || '',
-      spiritA: validFruits[0]?.spirit?.trim() || '',
-      fruitB:  validFruits[1]?.fruit?.trim()  || null,
-      spiritB: validFruits[1]?.spirit?.trim() || null,
+      // 新字段：fruits 数组（每项带 attr，支持 N 个果实）
+      fruits: resolvedFruits,
+      // 兼容旧字段（取前两槽，供旧代码读取）
+      fruitA:  resolvedFruits[0]?.fruit  || '',
+      spiritA: resolvedFruits[0]?.spirit || '',
+      fruitB:  resolvedFruits[1]?.fruit  || null,
+      spiritB: resolvedFruits[1]?.spirit || null,
+      // attrA / attrB：同步写入，供 analyzePlanFruits 旧路径兼容读取
+      attrA: resolvedFruits[0]?.attr || null,
+      attrB: resolvedFruits[1]?.attr || null,
       // 用户自选可抓异色精灵
       shinies: selectedShinies,
       // 赛季归属
@@ -891,15 +901,16 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
     goBack();
   };
 
-  // 切换属性时，预填默认值 + 重置 shinies（'world' = 混池，直接设置）
+  // 切换属性时，预填果实默认值（'world' = 混池，直接设置）
+  // 注意：不自动重置 shinies —— 系统不知道用户方案归属哪个赛季，
+  // 自动填充会把 S2 用户的可产出精灵错误替换成 S1 精灵，由用户手动通过「＋ 添加」选择。
   const handleAttrChange = (id) => {
     setAttrId(id);
     if (id === 'world') {
-      // 混池：不预填果实，shinies 不重置（保持用户已选）
+      // 混池：不预填果实，shinies 保持用户已选，不动
       return;
     }
-    // 每次切换具体属系，shinies 重置为新属系全选
-    setSelectedShinies(getShinisByAttr(id));
+    // 切换属系时不重置 shinies，保留用户已有选择（或保持为空让用户手动添加）
     if (!isEditing) {
       if (id) {
         const base = PLANS.find(p => p.id === id);

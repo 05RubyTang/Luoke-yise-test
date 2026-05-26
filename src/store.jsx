@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, useMemo, useRef, useState } from 'react';
 import { ALL_SHINIES, classifyPool, computePoolCounts, PLANS, resolveShinyKey, FRUIT_ATTR, getAttrByAnyName, getPlanFruitsArray, inferSpiritSeason, inferPlanSeason } from './data/plans';
+import { S2_PLANS } from './data/seasons/s2Plans';
 import { DEFAULT_SEASON } from './data/seasons';
 import { supabase } from './supabase';
 
@@ -129,6 +130,41 @@ function migrateResultSeasons(state) {
   };
 }
 
+// ─── activeTasks season 修正：对照 userPlanConfig 的 plan.season ────────────
+// 背景：早期 START_TASK 兜底逻辑（action.season || 'S1'）在 action.season 为空时
+//       会把 S2 自定义方案的 task 打上 'S1' 的标记，导致首页 S2 Tab 下任务不显示。
+// 策略：遍历 activeTasks，若 task.season === 'S1' 且对应的自定义方案
+//       （userPlanConfig 里 plan.custom=true）明确写了 plan.season === 'S2'，
+//       则把 task.season 修正为 'S2'。
+// 幂等：修正后结果确定，重复执行不变。
+// 触发条件：_migratedActiveTaskSeasons 不为 true（独立 flag，一次性执行）
+function migrateActiveTaskSeasons(state) {
+  if (state._migratedActiveTaskSeasons) return state;
+
+  // 只处理用户自定义方案（id: custom_xxx / user_plan_xxx），内置方案 season 不需修正
+  const userPlanMap = new Map(
+    (state.userPlanConfig || [])
+      .filter(p => p.custom && p.season)
+      .map(p => [p.id, p.season])
+  );
+
+  let changed = false;
+  const activeTasks = (state.activeTasks || []).map(task => {
+    const planSeason = userPlanMap.get(task.planId);
+    if (planSeason && planSeason !== task.season) {
+      changed = true;
+      return { ...task, season: planSeason };
+    }
+    return task;
+  });
+
+  return {
+    ...state,
+    activeTasks: changed ? activeTasks : state.activeTasks,
+    _migratedActiveTaskSeasons: true,
+  };
+}
+
 // ─── 存量 shieldBreak pool 字段修正 ───────────────────────────────────────────
 // 背景：早期 analyzePlanFruits 未读 plan.attrA/B，自定义方案果实属性推断失败，
 //       导致 RECORD_BREAK 时 classifyPool 返回 'world'，pool 字段被固化写错。
@@ -141,7 +177,7 @@ function migrateBreakPools(state) {
   if (state._migratedBreakPools) return state;
 
   // 合并内置方案 + 用户自定义方案
-  const allPlans = [...(PLANS || []), ...(state.userPlanConfig || [])];
+  const allPlans = [...(PLANS || []), ...(S2_PLANS || []), ...(state.userPlanConfig || [])];
 
   const fixBreaks = (task) => {
     const plan = allPlans.find(p => p.id === task.planId);
@@ -194,8 +230,9 @@ function getLocalState() {
         },
       };
       // 数据迁移：为旧版 S1 数据补全 season 字段（幂等）；再按出货精灵修正历史记录赛季；
-      // 再修正存量自定义方案 shieldBreak 的 pool 字段（早期 analyzePlanFruits 推断错误导致）
-      return migrateBreakPools(migrateResultSeasons(migrateLegacyData(merged)));
+      // 再修正存量自定义方案 shieldBreak 的 pool 字段（早期 analyzePlanFruits 推断错误导致）；
+      // 再对照 userPlanConfig 修正 activeTasks 的 task.season（早期 START_TASK 兜底 S1 导致误标）
+      return migrateActiveTaskSeasons(migrateBreakPools(migrateResultSeasons(migrateLegacyData(merged))));
     }
   } catch {}
   return buildDefaultState();
@@ -262,6 +299,7 @@ function reducer(state, action) {
       if (POOL_CLASSIFIABLE.includes(action.result) && action.spiritName) {
         // 同时查内置方案（S1+S2）和用户自定义方案（自定义方案 id 形如 user_plan_xxx）
         const plan = PLANS.find(p => p.id === action.planId)
+          || S2_PLANS.find(p => p.id === action.planId)
           || (state.userPlanConfig || []).find(p => p.id === action.planId);
         breakPool = classifyPool(action.spiritName, plan);
       } else if (action.result === 'jelly') {
@@ -561,9 +599,12 @@ function reducer(state, action) {
 
       // 实时推断 break 所属池（有 spiritName 就重新算，忽略存量 pool 字段，修复存量数据误判）
       const cacPlan = PLANS.find(p => p.id === action.planId)
+        || S2_PLANS.find(p => p.id === action.planId)
         || (state.userPlanConfig || []).find(p => p.id === action.planId);
-      const deriveBreakPool = (b) =>
-        b.spiritName ? classifyPool(b.spiritName, cacPlan) : (b.pool || 'world');
+      const deriveBreakPool = (b) => {
+        if (b.result === 'jelly') return 'world'; // 果冻/星辰虫固定归世界池，不走 classifyPool 重推
+        return b.spiritName ? classifyPool(b.spiritName, cacPlan) : (b.pool || 'world');
+      };
 
       // ── completedTask 快照的 shieldBreaks 存储策略（新方案）──────────────────
       // 无论 resetBreaks 是否为 true，都将全量 shieldBreaks 存入 completedTask。
@@ -1393,7 +1434,7 @@ async function hydrateFromCloud(uid, dispatch, localFallback, overwriteUserMeta 
       ...mergedRaw,
       completedTasks: (mergedRaw.completedTasks || []).filter(t => t.resultType !== 'abandoned'),
     };
-    const merged = migrateBreakPools(migrateResultSeasons(migrateLegacyData(mergedFiltered)));
+    const merged = migrateActiveTaskSeasons(migrateBreakPools(migrateResultSeasons(migrateLegacyData(mergedFiltered))));
     dispatch({ type: '_HYDRATE_FROM_CLOUD', data: merged });
     // 把合并结果写到新 uid 下（data 列精简，completed_tasks_full 列存完整 shieldBreaks）
     try {
@@ -1986,6 +2027,7 @@ export function StoreProvider({ children }) {
   // ── 三池保底计数（从事件流实时派生，随 activeTasks / completedTasks 自动更新）──
   const allPlans = useMemo(() => [
     ...PLANS,
+    ...S2_PLANS,
     ...(state.userPlanConfig || []).filter(p => !p.deleted),
   ], [state.userPlanConfig]);
 

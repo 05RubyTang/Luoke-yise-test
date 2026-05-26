@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { PLANS, getPlanAttrId, classifyPool, computeFamilyPool, getPlanMainPool, resolvePlanIconImg, getPlanFruitsArray } from '../data/plans';
+import { S2_PLANS } from '../data/seasons/s2Plans';
 import ProgressBar from '../components/ProgressBar';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -238,10 +239,34 @@ export default function Home({ navigate }) {
   const { state, poolCounts, authUser } = useStore();
   const hasEmail = !!authUser?.email;
   const currentSeason = state.currentSeason;
+
+  // 解析任务有效赛季：
+  // 优先以「方案本身的 season」为准（用户在 PlanEditor 里显式设置的是最终意图）。
+  // 兜底才读 task.season —— task.season 在历史旧数据中可能被错误写成 'S1'
+  // （如任务创建时 currentSeason 还是 S1，而方案的 season 此后才被修改为 S2）。
+  const resolveTaskSeason = (task) => {
+    const plan = PLANS.find(p => p.id === task.planId)
+      || S2_PLANS.find(p => p.id === task.planId)
+      || (state.userPlanConfig || []).find(p => p.id === task.planId);
+    // 方案明确声明了赛季 → 以方案为准
+    if (plan?.season) return plan.season;
+    // 方案没有 season 字段（内置属系方案 PLANS 均无）→ 兜底读 task.season
+    return task.season || null;
+  };
+
   // 只展示当前赛季的进行中任务（主区域）
-  const tasks = (state.activeTasks || []).filter(t => !currentSeason || !t.season || t.season === currentSeason);
+  const tasks = (state.activeTasks || []).filter(t => {
+    if (!currentSeason) return true;
+    const taskSeason = resolveTaskSeason(t);
+    // 无法确定赛季的旧数据（S1 内置方案也无 season 字段），兜底归 S1 显示
+    return !taskSeason || taskSeason === currentSeason;
+  });
   // 其他赛季还有进行中任务（用于折叠提示）
-  const otherSeasonTasks = (state.activeTasks || []).filter(t => t.season && t.season !== currentSeason);
+  const otherSeasonTasks = (state.activeTasks || []).filter(t => {
+    if (!currentSeason) return false;
+    const taskSeason = resolveTaskSeason(t);
+    return taskSeason && taskSeason !== currentSeason;
+  });
   const [otherExpanded, setOtherExpanded] = useState(false);
   const recentShinies = getRecentShinies(state);
   const hasRecentShinies = recentShinies.length > 0;
@@ -437,6 +462,7 @@ export default function Home({ navigate }) {
       {/* 进行中任务卡片 */}
       {tasks.map((task, idx) => {
         const rawPlan = PLANS.find(p => p.id === task.planId)
+          || S2_PLANS.find(p => p.id === task.planId)
           || (state.userPlanConfig || []).find(p => p.id === task.planId);
         if (!rawPlan) return null;
         // 自定义方案继承基础属性方案的图标
@@ -496,17 +522,21 @@ export default function Home({ navigate }) {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, flexWrap: 'wrap' }}>
                   <span className="active-task-badge">刷取中</span>
-                  {task.season && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10,
-                      background: task.season === 'S2' ? 'rgba(232,115,58,0.25)' : 'rgba(139,115,85,0.25)',
-                      color: task.season === 'S2' ? '#E8733A' : '#C4A882',
-                      border: `1px solid ${task.season === 'S2' ? 'rgba(232,115,58,0.5)' : 'rgba(139,115,85,0.45)'}`,
-                      lineHeight: 1.4,
-                    }}>
-                      {task.season === 'S1' ? '🌙 S1' : '🎪 S2'}
-                    </span>
-                  )}
+                  {(() => {
+                    const ts = resolveTaskSeason(task);
+                    if (!ts) return null;
+                    return (
+                      <span style={{
+                        fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10,
+                        background: ts === 'S2' ? 'rgba(232,115,58,0.25)' : 'rgba(139,115,85,0.25)',
+                        color: ts === 'S2' ? '#E8733A' : '#C4A882',
+                        border: `1px solid ${ts === 'S2' ? 'rgba(232,115,58,0.5)' : 'rgba(139,115,85,0.45)'}`,
+                        lineHeight: 1.4,
+                      }}>
+                        {ts === 'S1' ? '🌙 S1' : '🎪 S2'}
+                      </span>
+                    );
+                  })()}
                   <span style={{ fontWeight: 800, fontSize: 14, color: '#fff' }}>{plan.type}方案</span>
                 </div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
@@ -647,7 +677,7 @@ export default function Home({ navigate }) {
                 color: '#8B7355',
                 border: '1px solid rgba(139,115,85,0.35)',
               }}>
-                {otherSeasonTasks[0]?.season || 'S1'} 历史赛季
+                {resolveTaskSeason(otherSeasonTasks[0]) || 'S1'} 历史赛季
               </span>
               还有 {otherSeasonTasks.length} 个进行中的刷取
             </span>
@@ -662,6 +692,7 @@ export default function Home({ navigate }) {
           {/* 折叠内容 */}
           {otherExpanded && otherSeasonTasks.map((task, idx) => {
             const rawPlan = PLANS.find(p => p.id === task.planId)
+              || S2_PLANS.find(p => p.id === task.planId)
               || (state.userPlanConfig || []).find(p => p.id === task.planId);
             if (!rawPlan) return null;
             const attrBase = rawPlan.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
@@ -700,7 +731,7 @@ export default function Home({ navigate }) {
                         fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10,
                         background: 'rgba(139,115,85,0.35)', color: '#D4BFA0',
                         border: '1px solid rgba(139,115,85,0.5)',
-                      }}>🌙 {task.season}</span>
+                      }}>🌙 {resolveTaskSeason(task)}</span>
                       <span style={{ fontWeight: 800, fontSize: 13, color: '#F0E8D5' }}>{plan.type}方案</span>
                     </div>
                     <div style={{ fontSize: 11, color: 'rgba(240,232,213,0.5)' }}>

@@ -8,7 +8,7 @@ const getModalRoot = () => document.getElementById('modal-root') || document.bod
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
 import ShieldDots from '../components/ShieldDots';
-import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL, computePoolCounts, classifyResultType } from '../data/plans';
+import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL, computePoolCounts, classifyResultType, resolveTaskSeasonFromPlans, fuzzyResolveSpiritName } from '../data/plans';
 import { SEASONS } from '../data/seasons';
 import { S2_PLANS } from '../data/seasons/s2Plans';
 
@@ -80,7 +80,10 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
 
   const base = import.meta.env.BASE_URL;
   const plan = PLANS.find(p => p.id === task.planId)
+    || S2_PLANS.find(p => p.id === task.planId)
     || (userPlanConfig || []).find(p => p.id === task.planId) || null;
+  // display-time 精灵名纠偏：不改 store，只修正展示用的名字
+  const { resolved: displaySpirit } = fuzzyResolveSpiritName(task.resultSpirit || '');
   const isManual = task.resultType === 'manual';
   const isSuccess = task.resultType !== 'abandoned';
   const poolType = isSuccess && !isManual ? inferPoolType(task, plan) : null;
@@ -93,14 +96,23 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   const mixedBlood = breakdowns.mixed_blood || 0;
   const hasShieldBreaks = task.shieldBreaks && task.shieldBreaks.length > 0;
 
-  // ── 三池进度快照（从 shieldBreaks 聚合，优先用 spiritName 实时推断，兜底读 pool 字段）──
+  // ── 三池进度快照（从 shieldBreaks 聚合，与 computePoolCounts/countBreak 口径对齐）──
+  // 规则：shiny/failed 不计入任何池；jelly 固定归世界池；
+  //       有 spiritName 时总是实时重推（忽略存量 pool 字段）；无 spiritName 兜底读 pool 字段。
   const POOL_RESULT_TYPES = ['polluted', 'original', 'jelly', 'shiny_blood', 'mixed_blood'];
   const poolSnapshot = (() => {
     if (!hasShieldBreaks) return null;
     let family = 0, attr = 0, world = 0, unknown = 0;
     for (const b of task.shieldBreaks) {
-      // 优先用 spiritName 实时推断（修正旧数据中因精灵缺录导致的错误 pool 值）
-      const resolvedPool = b.spiritName ? classifyResultType(b.spiritName, plan) : b.pool;
+      // shiny（出货）/ failed（失败逃跑）不计入任何保底池
+      if (b.result === 'shiny' || b.result === 'failed') continue;
+      // jelly（果冻/星辰虫）固定归世界池，不走 classifyResultType
+      if (b.result === 'jelly') { world++; continue; }
+      // 有 spiritName 时实时重推（对齐 classifyResultType 最新逻辑，修正旧存量 pool 错误）；
+      // 无 spiritName 时兜底读 pool 字段（无法重推）。
+      // 先对 spiritName 做 display-time 模糊纠偏，让打错字的存量记录也能正确推断池归属。
+      const correctedSpiritName = b.spiritName ? fuzzyResolveSpiritName(b.spiritName).resolved : null;
+      const resolvedPool = correctedSpiritName ? classifyResultType(correctedSpiritName, plan) : b.pool;
       if (resolvedPool === 'family') family++;
       else if (resolvedPool === 'attr') attr++;
       else if (resolvedPool === 'world') world++;
@@ -114,9 +126,9 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   // 属性球信息（根据出货精灵属性动态）
   // 属性球跟随方案的果实精灵（spiritA），而非出货精灵的属性
   // 例：菊花梨方案（萌系）全程抓菊花梨消耗美妙球，即便最终出货的是治愈兔（火系）
-  const ballInfo = getBallByPlan(plan) || (task.resultSpirit ? getBallBySpirit(task.resultSpirit) : null);
-  // 属系 icon
-  const attrId = task.resultSpirit ? getAttrIdBySpirit(task.resultSpirit) : null;
+  const ballInfo = getBallByPlan(plan) || (displaySpirit ? getBallBySpirit(displaySpirit) : null);
+  // 属系 icon（用纠偏后名字反查属性，确保打错字的存量记录也能显示正确属性图标）
+  const attrId = displaySpirit ? getAttrIdBySpirit(displaySpirit) : null;
   const isFamilyPool = poolType === 'family';
 
   // 欧非称号图片（仅非手动且有破盾数时展示）
@@ -212,7 +224,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
                 marginLeft: 12,
                 position: 'relative',
               }}>
-                <SpiritAvatar bare name={task.resultSpirit} obtained size={118} />
+                <SpiritAvatar bare name={displaySpirit} obtained size={118} />
                 {/* 欧非称号贴片：精灵图左下角，突破卡片边界 */}
                 {luckImg && (
                   <img
@@ -256,7 +268,7 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
                     color: '#EEE7D7',
                     textShadow: '3px 4px 0 rgba(0,0,0,0.93)',
                     lineHeight: 1.2,
-                  }}>{task.resultSpirit}</span>
+                  }}>{displaySpirit}</span>
                 </div>
 
                 {/* 方案名 + 出货池 tag */}
@@ -472,6 +484,8 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
   const { dispatch } = useStore();
   const plan = PLANS.find(p => p.id === task.planId)
     || (userPlanConfig || []).find(p => p.id === task.planId) || null;
+  // display-time 精灵名纠偏：不改 store，只修正展示用的名字
+  const { resolved: displaySpirit } = fuzzyResolveSpiritName(task.resultSpirit || '');
   const isManual = task.resultType === 'manual';
   const isSuccess = task.resultType !== 'abandoned';
   // 三池类型（兼容旧数据）
@@ -549,7 +563,7 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
           overflow: 'hidden',
         }}>
           {isSuccess
-            ? <SpiritAvatar name={task.resultSpirit} obtained size={44} showName={false} />
+            ? <SpiritAvatar name={displaySpirit} obtained size={44} showName={false} />
             : plan ? <PlanIcon plan={plan} size={30} /> : <span style={{ fontSize: 22 }}>?</span>
           }
         </div>
@@ -560,7 +574,7 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
             marginBottom: 3,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {isSuccess ? task.resultSpirit : `${plan?.type || '?'}方案 · 未完成`}
+            {isSuccess ? displaySpirit : `${plan?.type || '?'}方案 · 未完成`}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, color: '#A09080', fontWeight: 500 }}>
@@ -609,7 +623,7 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
           border: '1px solid rgba(200,53,26,0.2)',
         }}>
           <span style={{ fontSize: 11, color: '#C8351A', fontWeight: 700 }}>
-            确定删除这条记录？{isSuccess && task.resultSpirit ? `（若无其他「${task.resultSpirit}」记录，将恢复为未解锁）` : ''}
+            确定删除这条记录？{isSuccess && displaySpirit ? `（若无其他「${displaySpirit}」记录，将恢复为未解锁）` : ''}
           </span>
           <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 8 }}>
             <button onClick={handleDelete} style={{
@@ -980,6 +994,15 @@ function AvatarUploader({ avatarUrl, onFileChange }) {
 
 const CHANGELOG = [
   {
+    version: 'v4.2',
+    date: '2026-05-26',
+    tags: ['新方案', '优化'],
+    items: [
+      '开始新刷取页「世界池混刷」Tab 现在可正常看到两套世界池混刷方案',
+      '两套世界池混刷方案改名：「熊狼混刷」（恶魔狼果实 + 月牙雪熊果实）、「鸽梨混刷」（菊花梨果实 + 公平鸽果实）',
+    ],
+  },
+  {
     version: 'v4.1',
     date: '2026-05-22',
     tags: ['新方案', '新功能', '优化'],
@@ -1285,6 +1308,43 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
   const [fbContent, setFbContent] = useState('');
   const [fbContact, setFbContact] = useState('');
   const [fbStatus, setFbStatus] = useState('idle'); // 'idle' | 'sending' | 'done' | 'error'
+  const [fbImages, setFbImages] = useState([]); // [{ file, previewUrl }]
+  const fbFileInputRef = useRef(null);
+
+  // 选择图片
+  const handleFbImageSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const remaining = 3 - fbImages.length;
+    const toAdd = files.slice(0, remaining).map(file => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }));
+    setFbImages(prev => [...prev, ...toAdd]);
+    // 清空 input 值，允许重复选同一文件
+    e.target.value = '';
+  };
+
+  // 移除某张图片
+  const removeFbImage = (idx) => {
+    setFbImages(prev => {
+      URL.revokeObjectURL(prev[idx].previewUrl);
+      return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  // 上传单张图到 Supabase Storage，返回 public URL
+  const uploadFbImage = async (file, uid) => {
+    const ext = file.name.split('.').pop() || 'jpg';
+    const prefix = uid ? `user_${uid.slice(0, 8)}` : 'anon';
+    const filename = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const { error } = await supabase.storage
+      .from('feedback-images')
+      .upload(filename, file, { contentType: file.type, upsert: false });
+    if (error) throw error;
+    const { data } = supabase.storage.from('feedback-images').getPublicUrl(filename);
+    return data.publicUrl;
+  };
 
   const submitFeedback = async () => {
     const trimmed = fbContent.trim();
@@ -1293,15 +1353,26 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user?.id ?? null;
+
+      // 先上传所有图片
+      let imageUrls = [];
+      if (fbImages.length > 0) {
+        imageUrls = await Promise.all(fbImages.map(img => uploadFbImage(img.file, uid)));
+      }
+
       const { error } = await supabase.from('feedback').insert({
         user_id: uid,
         content: trimmed,
         contact: fbContact.trim() || null,
+        image_urls: imageUrls.length > 0 ? imageUrls : null,
       });
       if (error) throw error;
       setFbStatus('done');
       setFbContent('');
       setFbContact('');
+      // 清理图片预览 URL
+      fbImages.forEach(img => URL.revokeObjectURL(img.previewUrl));
+      setFbImages([]);
     } catch (e) {
       console.warn('[Feedback] 提交失败:', e?.message);
       setFbStatus('error');
@@ -1749,7 +1820,12 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                 });
 
               const familyEntries = activeTasks
-                .filter(t => (t.season || 'S1') === seasonKey)
+                // 与 computePoolCounts 保持同一口径：优先读方案的 season，兜底读 task.season
+                // 避免 task.season 历史写错导致 S2 任务被误归到 S1 家族池
+                .filter(t => {
+                  const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
+                  return (effectiveSeason || 'S1') === seasonKey;
+                })
                 .map(t => {
                   const plan = allPlans.find(p => p.id === t.planId) || null;
                   const count = plan ? computeFamilyPool(t, plan) : 0;
@@ -1957,7 +2033,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       padding: '9px 0', borderBottom: '1px solid var(--divider)',
                     }}>
                       <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>版本</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.1</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.2</span>
                     </div>
                     <div
                       style={{
@@ -2129,13 +2205,51 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                   onChange={e => { setFbContent(e.target.value); if (fbStatus === 'error') setFbStatus('idle'); }}
                 />
                 <div className="feedback-char-count">{fbContent.length} / 500</div>
+
+                {/* ── 图片上传区域 ── */}
+                <div className="feedback-img-area">
+                  {fbImages.map((img, idx) => (
+                    <div key={idx} className="feedback-img-thumb">
+                      <img src={img.previewUrl} alt={`截图${idx + 1}`} className="feedback-img-preview" />
+                      <button
+                        className="feedback-img-remove"
+                        onClick={() => removeFbImage(idx)}
+                        aria-label="删除图片"
+                      >✕</button>
+                    </div>
+                  ))}
+                  {fbImages.length < 3 && (
+                    <button
+                      className="feedback-img-add"
+                      onClick={() => fbFileInputRef.current?.click()}
+                      title="添加截图（最多3张）"
+                    >
+                      <span className="feedback-img-add-icon">+</span>
+                      <span className="feedback-img-add-label">截图</span>
+                    </button>
+                  )}
+                  <input
+                    ref={fbFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: 'none' }}
+                    onChange={handleFbImageSelect}
+                  />
+                </div>
+                {fbImages.length > 0 && (
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: -4 }}>
+                    已选 {fbImages.length}/3 张截图，提交时将自动上传
+                  </div>
+                )}
+
                 {fbStatus === 'error' && <div className="feedback-error">提交失败，请稍后再试</div>}
                 <button
                   className="feedback-submit-btn"
                   disabled={!fbContent.trim() || fbStatus === 'sending'}
                   onClick={submitFeedback}
                 >
-                  {fbStatus === 'sending' ? '提交中…' : '提交反馈'}
+                  {fbStatus === 'sending' ? '上传中…' : '提交反馈'}
                 </button>
               </div>
             )}
@@ -2217,7 +2331,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                 {[
                   { key: 'all', label: '全部', emoji: '📋' },
                   { key: 'S2',  label: 'S2 狂欢怪谈', emoji: '🎪' },
-                  { key: 'S1',  label: 'S1 暗夜时光', emoji: '🌙' },
+                  { key: 'S1',  label: 'S1 暗夜拾光', emoji: '🌙' },
                 ].map(({ key, label, emoji }) => {
                   const isActive = historySeasonFilter === key;
                   const isS2Tab = key === 'S2';

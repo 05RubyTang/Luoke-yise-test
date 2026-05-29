@@ -1,4 +1,4 @@
-// S1「暗夜时光」赛季方案数据
+// S1「暗夜拾光」赛季方案数据
 const base = import.meta.env.BASE_URL;
 
 export const S1_PLANS = [

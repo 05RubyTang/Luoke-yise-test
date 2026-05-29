@@ -772,4 +772,23 @@ export const S2_PLANS = [
     note: '电系单果，100% 定向刷出炫光迪迪',
   },
 
+  // 14. 幻系混刷（粉星仔果 + 幽星光果）：双果混刷 → 幻系池 → 帅帅魔偶（幽星光为暮星辰同家族）
+  {
+    id: 's2_attr_phantom_puppet_mix',
+    season: 'S2',
+    category: 'attr',
+    type: '幻系混刷',
+    icon: '🔮',
+    iconImg: `${base}attrs/phantom.png`,
+    color: '#9C27B0',
+    fruitA: '粉星仔果实',
+    fruitB: '幽星光果实',
+    spiritA: '粉星仔',
+    spiritB: '幽星光',
+    shinies: ['帅帅魔偶'],
+    unlockA: '待游戏更新后补充',
+    unlockB: '待游戏更新后补充',
+    note: '幻系混刷，100% 定向刷出帅帅魔偶异色',
+  },
+
 ];

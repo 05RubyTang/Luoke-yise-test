@@ -165,39 +165,48 @@ function migrateActiveTaskSeasons(state) {
   };
 }
 
-// ─── 存量 shieldBreak pool 字段修正 ───────────────────────────────────────────
-// 背景：早期 analyzePlanFruits 未读 plan.attrA/B，自定义方案果实属性推断失败，
-//       导致 RECORD_BREAK 时 classifyPool 返回 'world'，pool 字段被固化写错。
-// 策略：仅对自定义方案（plan.custom=true）的 shieldBreaks 做修正；
-//         有 spiritName 且 pool 有值时，用 classifyPool 重新推断，若不一致则覆盖；
-//         无 spiritName / 无 pool 的记录不做处理（无法重推，保持原状）。
+// ─── 存量 shieldBreak pool 字段修正（V2）──────────────────────────────────────
+// V1 背景：早期 analyzePlanFruits 未读 plan.attrA/B，自定义方案果实属性推断失败，
+//         导致 RECORD_BREAK 时 classifyPool 返回 'world'，pool 字段被固化写错。
+// V2 新增：classifyResultType 新增「条件3」（产出精灵须在 plan.shinies 中才归家族池），
+//         修正了 S2「恶系方案2」（spiritA=恶魔狼，shinies=[小夜,小丑公爵]）旧 break
+//         被错误标记为 pool='family' 的问题——出货小夜/小丑公爵应归恶系属性池，
+//         其他（恶魔狼等触发污染精灵）同样归恶系属性池。
+//
+// 策略（V2）：扩展至所有方案（内置 + 自定义），
+//            有 spiritName 且 pool 有值时，用最新 classifyPool 重新推断，若不一致则覆盖；
+//            无 spiritName 的 break（如 jelly / shiny / failed）不做处理。
 // 幂等：同一 break 重推结果确定，重复执行结果不变。
-// 触发条件：_migratedBreakPools 不为 true（独立 flag，一次性执行）
+// 触发条件：_migratedBreakPoolsV2 不为 true（新 flag，V1 已标记的用户也会再跑一次）
 function migrateBreakPools(state) {
-  if (state._migratedBreakPools) return state;
+  if (state._migratedBreakPoolsV2) return state;
 
   // 合并内置方案 + 用户自定义方案
   const allPlans = [...(PLANS || []), ...(S2_PLANS || []), ...(state.userPlanConfig || [])];
 
   const fixBreaks = (task) => {
     const plan = allPlans.find(p => p.id === task.planId);
-    // 只修正自定义方案（内置方案 pool 推断一直正确）
-    if (!plan || !plan.custom) return task;
+    if (!plan) return task;  // 找不到方案的 task 跳过（孤立记录）
+    let anyChanged = false;
     const newBreaks = (task.shieldBreaks || []).map(br => {
-      // 没有 spiritName 或没有写入 pool 的 break，无法重推，跳过
+      // 没有 spiritName 的 break（jelly/shiny/failed/无精灵奇遇）无法重推，跳过
       if (!br.spiritName || !br.pool) return br;
+      // jelly 固定归世界池，跳过重推
+      if (br.result === 'jelly') return br;
       const correctPool = classifyPool(br.spiritName, plan);
       if (!correctPool || correctPool === br.pool) return br;
+      anyChanged = true;
       return { ...br, pool: correctPool };
     });
-    return { ...task, shieldBreaks: newBreaks };
+    return anyChanged ? { ...task, shieldBreaks: newBreaks } : task;
   };
 
   return {
     ...state,
     activeTasks:   (state.activeTasks   || []).map(fixBreaks),
     completedTasks: (state.completedTasks || []).map(fixBreaks),
-    _migratedBreakPools: true,
+    _migratedBreakPools: true,    // 保留旧 flag 兼容（让旧逻辑不重复执行）
+    _migratedBreakPoolsV2: true,  // 新 flag：V2 迁移完成标记
   };
 }
 
@@ -741,13 +750,21 @@ function reducer(state, action) {
       const newCompleted = state.completedTasks.filter(t => t.id !== action.taskId);
       let newSpirits = state.spirits;
       const spiritName = taskToDelete.resultSpirit;
-      if (spiritName && taskToDelete.resultType !== 'abandoned') {
+      // 只有真正的异色出货类型才关联图鉴（与 RECONCILE_SHINIES 白名单保持一致）
+      const SHINY_RESULT_TYPES_DEL = new Set([
+        'family', 'attr', 'world', 'pool', 'offpool', 'manual',
+      ]);
+      const isDeletingShinyRecord = spiritName
+        && taskToDelete.resultType !== 'abandoned'
+        && (!taskToDelete.resultType || SHINY_RESULT_TYPES_DEL.has(taskToDelete.resultType));
+      if (isDeletingShinyRecord) {
         // 图鉴点亮放宽：判断"是否还存在同家族记录"，避免误关图鉴
         // 把当前删掉的记录和剩余记录都归一化到家族代表名再比较
         const shinyKeyToDelete = resolveShinyKey(spiritName);
         const stillHasRecord = newCompleted.some(
           t => t.resultType !== 'abandoned'
             && t.resultSpirit
+            && SHINY_RESULT_TYPES_DEL.has(t.resultType)
             && resolveShinyKey(t.resultSpirit) === shinyKeyToDelete
         );
         if (!stillHasRecord && state.spirits[shinyKeyToDelete]?.obtained) {
@@ -956,12 +973,23 @@ function reducer(state, action) {
     //   - 跨设备合并过来的历史记录
     // 完全幂等：已点亮的格子不会被重复写，未涉及的格子保持原状。
     // 注意：只追加点亮（obtained=false → true），不会反向关闭，避免误伤。
+    // 白名单：只有真正的异色出货类型才允许点亮图鉴，普通奇遇（original/polluted/
+    //         shiny_blood/mixed_blood）不在白名单内，不会误点亮。
     case 'RECONCILE_SHINIES': {
+      // 只有真正的异色出货 resultType 才允许点亮图鉴
+      // 'family'/'attr'/'world'/'pool'/'offpool'/'manual' = 异色出货
+      // 'original'/'polluted'/'shiny_blood'/'mixed_blood' = 普通奇遇，不应点亮
+      const SHINY_RESULT_TYPES = new Set([
+        'family', 'attr', 'world', 'pool', 'offpool', 'manual',
+      ]);
       const newSpirits = { ...state.spirits };
       let changed = 0;
       (state.completedTasks || []).forEach(t => {
         if (!t || !t.resultSpirit) return;
         if (t.resultType === 'abandoned') return;
+        // 白名单过滤：resultType 不在异色出货白名单内的记录一律跳过
+        // 防止普通奇遇（original/polluted/shiny_blood/mixed_blood）误点亮图鉴
+        if (t.resultType && !SHINY_RESULT_TYPES.has(t.resultType)) return;
         const key = resolveShinyKey(t.resultSpirit);
         if (!key) return;
         const cur = newSpirits[key];

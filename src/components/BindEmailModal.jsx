@@ -320,7 +320,7 @@ export default function BindEmailModal({ onClose, onSuccess, initialMode = 'bind
                 <div className="sent-tips" style={{ marginTop: 8 }}>
                   <p>⏳ 邮件通常 <strong>1 分钟内</strong>送达，请耐心等待</p>
                   <p>📌 没收到？请检查垃圾邮件箱</p>
-                  <p>🔢 验证码 <strong>10 分钟</strong>内有效，共 8 位数字</p>
+                  <p>🔢 验证码 <strong>30 分钟</strong>内有效，共 8 位数字</p>
                 </div>
 
                 <button

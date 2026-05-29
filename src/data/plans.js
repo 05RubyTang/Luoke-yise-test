@@ -118,6 +118,7 @@ export const FRUIT_ATTR = {
   // S2 新增双果混刷方案果实
   '缇塔果实':      'mech',    // 机械系混刷（机械方方果+缇塔果）
   '水泡壳果实':    'water',   // 水系混刷（锤头鹳果+水泡壳果）
+  '幽星光果实':    'phantom', // 幻系混刷（粉星仔果+幽星光果，幽星光为暮星辰同家族进化前形态）
 };
 
 // ─── 精灵名 → 属性2 ID 映射（双属性精灵的第2属性，仅用于出货范围判断） ─────────
@@ -421,25 +422,25 @@ export function analyzePlanFruits(plan) {
 
 /**
  * 判断出货/污染精灵属于哪个池子：
- *   'family' — 家族池（单刷方案，且出货精灵本身有家族池，即注册在某方案 shinies 中）
- *   'attr'   — 属性池（同属混刷/单刷的非家族精灵，或单刷「无家族池精灵」的同属情况）
- *   'world'  — 世界池（跨属混刷；或属性不匹配的情况）
+ *   'family' — 家族池：同时满足以下三个条件
+ *                1. 只使用了 1 种果实（单刷）
+ *                2. 产出精灵与果实对应精灵相同（spiritA 或 spiritB，可扩展至 C/D）
+ *                3. 产出精灵已在 ALL_SHINIES 中登记（即该精灵在游戏中确实有异色版本）
+ *              例：恶魔狼果实 → 小夜，不是家族池（恶魔狼自身无异色，不在 ALL_SHINIES）
+ *   'attr'   — 属性池：精灵属性与果实属性匹配（单果实非家族 / 同属混刷）
+ *   'world'  — 世界池：跨属混刷；或属性不匹配
  *
  * 规则（按果实来判断，而非 category）：
  *   1. 只有1种果实（单刷）：
- *      a. 出货精灵「有家族池」（存在于任意方案的 shinies 里）：
- *         - 是目标精灵（spiritA/spiritB）→ family
- *         - 同属性非目标精灵 → attr
- *         - 不同属性 → world
- *      b. 出货精灵「无家族池」（非赛季/非注册精灵，自定义单刷场景）：
- *         - 直接跳过 family 判断，看果实属性是否与精灵属性匹配
- *         - 精灵属性与果实属性吻合 → attr（字典查不到则按 plan.custom 兜底归 attr）
- *         - 不吻合 → world
- *   2. 多种果实且全部同属性（同属混刷）：
- *      - 内置精灵（SPIRIT_ATTR1 可查到）：同属精灵 → attr，不同属 → world
- *      - 自定义精灵（字典查不到属性）：直接归 attr（方案已明确声明属系，无法反查只能信任）
- *   3. 多种果实且跨属性（跨属混刷）：
- *      - 全部 → world
+ *      a. 产出精灵 = spiritA/B 且在 ALL_SHINIES → family
+ *      b. 其他：按精灵属性 vs 果实属性判断
+ *         - 属性匹配（含第2属性）→ attr
+ *         - 自定义方案且精灵属性字典查不到 → attr（信任方案属系声明）
+ *         - 属性不匹配 → world
+ *   2. 多种果实且全部同属性（同属混刷）：无家族池
+ *      - 内置精灵（SPIRIT_ATTR1 可查到）：同属 → attr，不同属 → world
+ *      - 自定义精灵（字典查不到属性）：直接归 attr
+ *   3. 多种果实且跨属性（跨属混刷）：全部 → world
  *
  * 属性池出货范围说明（官方规则）：
  *   当某属性池触发出货时，该属性下所有精灵（包括第2属性属于该系的精灵）
@@ -453,16 +454,27 @@ export function classifyResultType(resultSpirit, plan) {
   const { isSingleFruit, isSameAttr, fruitAttrId } = analyzePlanFruits(plan);
 
   if (isSingleFruit) {
-    // 判断该精灵是否存在于任意方案的 shinies（即「有家族池」）
-    const hasFamilyPool = ALL_SHINIES.includes(resultSpirit)
+    // 家族池判断，三个条件必须同时满足：
+    //   条件1：产出精灵在 ALL_SHINIES 中（该精灵在游戏里有异色版本）
+    //   条件2：产出精灵 = 本方案的果实精灵（spiritA 或 spiritB）
+    //   条件3：该方案的 shinies 列表中也包含该精灵（即该方案确实能产出此异色）
+    //
+    // 条件3 是关键修复点：
+    //   - S2「恶系方案2」spiritA=恶魔狼，但 shinies=['小夜','小丑公爵']（恶魔狼在S2无异色）
+    //   - 若只用条件1+2，恶魔狼在 ALL_SHINIES（S1有异色）+ spiritA 匹配 → 会误判为家族池
+    //   - 加上条件3：shinies 不包含恶魔狼 → 正确排除家族池，归属系池
+    const inAllShinies = ALL_SHINIES.includes(resultSpirit)
       || ALL_SHINIES.some(k => fuzzyMatch(k, resultSpirit));
-
-    if (hasFamilyPool) {
-      // 有家族池：先判断是否是本方案的目标精灵
+    if (inAllShinies) {
       const targetFamilies = [plan.spiritA, plan.spiritB].filter(Boolean);
-      if (targetFamilies.some(t => fuzzyMatch(t, resultSpirit))) return 'family';
+      const matchesFamilySpirit = targetFamilies.some(t => fuzzyMatch(t, resultSpirit));
+      // 条件3：方案的 shinies 列表包含该精灵（该方案本赛季能产出此异色）
+      const inPlanShinies = !plan.shinies?.length
+        || plan.shinies.some(s => fuzzyMatch(s, resultSpirit) || fuzzyMatch(resultSpirit, s));
+      if (matchesFamilySpirit && inPlanShinies) return 'family';
     }
-    // 无家族池 or 有家族池但非目标精灵：按属性判断属性池 / 世界池
+
+    // 非家族池：按精灵属性 vs 果实属性判断属系池 / 世界池
     if (fruitAttrId) {
       const spiritAttr1 = lookupAttr(resultSpirit);
       const spiritAttr2 = lookupAttr2(resultSpirit);
@@ -706,7 +718,8 @@ export function resolveShinyKey(spiritName) {
  */
 // 解析任务的有效赛季：优先读方案的 season，兜底读 task.season。
 // 与 Home.jsx resolveTaskSeason 逻辑保持一致。
-function resolveTaskSeasonFromPlans(task, allPlans) {
+// export 供 Profile.jsx 等页面直接使用，确保所有地方口径统一。
+export function resolveTaskSeasonFromPlans(task, allPlans) {
   const plan = (allPlans || []).find(p => p.id === task.planId);
   if (plan?.season) return plan.season;
   return task.season || null;
@@ -754,8 +767,13 @@ export function computePoolCounts(activeTasks, completedTasks, allPlans, season)
   const countBreak = (br, plan, planAttrId, onFamily) => {
     // shiny（出货事件本身）和 failed（失败/逃跑）不计入任何保底池
     if (br.result === 'shiny' || br.result === 'failed') return;
-    // 推断池归属：优先取已存储的 pool 字段，否则实时推断
-    const pool = br.pool || (plan ? classifyResultType(br.spiritName, plan) : 'world');
+    // 推断池归属：有 spiritName 时总是实时重推（忽略存量 pool 字段）
+    // 原因：classifyResultType 的判断逻辑可能因需求变化而升级（如增加条件3），
+    //       存量 pool 字段可能基于旧逻辑写入了错误值（如恶系方案2旧记录 pool='family'），
+    //       总是实时重推确保计算结果与最新逻辑一致，与 computeFamilyPool 保持一致。
+    const pool = br.result === 'jelly'
+      ? 'world'  // 果冻/星辰虫：固定归世界池，不走 classifyResultType
+      : (br.spiritName ? classifyResultType(br.spiritName, plan) : (br.pool || 'world'));
     if (pool === 'family') {
       if (onFamily) onFamily();
     } else if (pool === 'attr') {
@@ -940,4 +958,38 @@ export function inferPlanSeason(plan) {
   if (!shinies || shinies.length === 0) return null;
   const s2Count = shinies.filter(n => S2_SPIRIT_SET.has(n)).length;
   return s2Count > shinies.length / 2 ? 'S2' : 'S1';
+}
+
+// ─── 存量精灵名模糊纠偏 ───────────────────────────────────────────────────────
+// 候选精灵名：SPIRIT_ATTR1 所有键（含属性精灵）+ ALL_SHINIES（含出货精灵），去重合并
+const _FUZZY_SPIRIT_POOL = (() => {
+  const seen = new Set();
+  const result = [];
+  const addName = n => { if (n && !seen.has(n)) { seen.add(n); result.push(n); } };
+  Object.keys(SPIRIT_ATTR1).forEach(addName);
+  ALL_SHINIES.forEach(addName);
+  return result;
+})();
+
+/**
+ * fuzzyResolveSpiritName(rawName)
+ * 对存量精灵名做 display-time 模糊纠偏：
+ *   1. 精确命中 → 直接返回，corrected=false
+ *   2. fuzzyMatch 唯一候选 → 返回纠偏名，corrected=true
+ *   3. 多个候选 → 取长度最接近的，corrected=true
+ *   4. 无候选 → 原名，corrected=false（不乱猜）
+ * 返回：{ resolved: string, corrected: boolean }
+ */
+export function fuzzyResolveSpiritName(rawName) {
+  if (!rawName) return { resolved: rawName, corrected: false };
+  const trimmed = rawName.trim();
+  // 精确命中
+  if (_FUZZY_SPIRIT_POOL.includes(trimmed)) return { resolved: trimmed, corrected: false };
+  // 模糊查找
+  const candidates = _FUZZY_SPIRIT_POOL.filter(n => fuzzyMatch(n, trimmed));
+  if (candidates.length === 0) return { resolved: trimmed, corrected: false };
+  if (candidates.length === 1) return { resolved: candidates[0], corrected: true };
+  // 多个候选：取长度最接近的（最保守的猜测）
+  candidates.sort((a, b) => Math.abs(a.length - trimmed.length) - Math.abs(b.length - trimmed.length));
+  return { resolved: candidates[0], corrected: true };
 }

@@ -483,13 +483,24 @@ export default function Home({ navigate }) {
         const attrCount   = attrId ? ((poolCounts?.attrPools || {})[attrId] || 0) : 0;
         const worldCount  = poolCounts?.worldPool || 0;
         // 本任务在系别/世界池的贡献（用于标注「继承 X + 本次 Y」）
-        const resolvePool = (b) => b.pool ?? (
-          b.result === 'polluted' && b.spiritName ? classifyPool(b.spiritName, plan) : null
+        // 与 computePoolCounts 完全对齐：
+        //   1. 只统计 task.startTime 之后的 break（COMPLETE_AND_CONTINUE 后旧 break 不计）
+        //   2. jelly 固定归世界池；有 spiritName 时总是实时重推（忽略存量 pool 字段）；
+        //      无 spiritName 时兜底读 pool 字段（无法重推）。
+        const taskStart = task.startTime || null;
+        const resolvePool = (b) => {
+          if (b.result === 'shiny' || b.result === 'failed') return null; // 不计入任何池
+          if (b.result === 'jelly') return 'world'; // 果冻/星辰虫固定归世界池
+          return b.spiritName ? classifyPool(b.spiritName, plan) : (b.pool || null);
+        };
+        // 过滤 startTime 之前的旧 break，与 computePoolCounts 对 activeTasks 的处理方式一致
+        const currentRoundBreaks = (task.shieldBreaks || []).filter(
+          b => !(taskStart && b.time && b.time < taskStart)
         );
         const taskAttrCount  = attrId
-          ? (task.shieldBreaks || []).filter(b => resolvePool(b) === 'attr').length
+          ? currentRoundBreaks.filter(b => resolvePool(b) === 'attr').length
           : 0;
-        const taskWorldCount = (task.shieldBreaks || []).filter(b => resolvePool(b) === 'world').length;
+        const taskWorldCount = currentRoundBreaks.filter(b => resolvePool(b) === 'world').length;
         const inheritAttrCount  = Math.max(0, attrCount - taskAttrCount);
         const inheritWorldCount = Math.max(0, worldCount - taskWorldCount);
         const familyRemain = Math.max(0, 80 - familyCount);

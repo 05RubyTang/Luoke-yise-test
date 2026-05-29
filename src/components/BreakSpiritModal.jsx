@@ -206,7 +206,7 @@ export default function BreakSpiritModal({ plan, result, onSelect, onClose, hasT
                 <SpiritCard
                   key={s.name}
                   name={s.name}
-                  onClick={() => onSelect(s.name)}
+                  onClick={() => confirmSpirit(s.name)}
                 />
               ))}
             </div>

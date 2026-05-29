@@ -5,7 +5,7 @@ const base = import.meta.env.BASE_URL;
 
 /**
  * 赛季切换器组件
- * 用于在 S1「暗夜时光」和 S2「马戏团奇旅」之间切换
+ * 用于在 S1「暗夜拾光」和 S2「狂欢怪谈」之间切换
  */
 export default function SeasonSwitcher({ style }) {
   const { state, dispatch } = useStore();

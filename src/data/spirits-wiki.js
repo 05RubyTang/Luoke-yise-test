@@ -571,6 +571,20 @@ export const SPIRITS_WIKI_IMG = {
 };
 
 // 通过精灵名获取 wiki 图片 URL
+// 支持三级匹配：精确 → 去空格精确 → 前缀子串（兜底打错字的存量精灵名）
 export function getWikiSpiritImg(name) {
-  return SPIRITS_WIKI_IMG[name] || null;
+  if (!name) return null;
+  // 精确命中
+  if (SPIRITS_WIKI_IMG[name]) return SPIRITS_WIKI_IMG[name];
+  // 去空格精确匹配（兜底"恶魔狼 异色"写成"恶魔狼异色"之类的情况）
+  const norm = name.trim().replace(/\s+/g, '');
+  for (const [k, v] of Object.entries(SPIRITS_WIKI_IMG)) {
+    if (k.replace(/\s+/g, '') === norm) return v;
+  }
+  // 前缀匹配：精灵名是 key 的前缀（如「呼呼猪」匹配「呼呼猪 异色」之前的基础图）
+  // 只匹配 key 本身不含空格的条目（避免形态变体误命中）
+  for (const [k, v] of Object.entries(SPIRITS_WIKI_IMG)) {
+    if (!k.includes('（') && !k.includes(' ') && k.startsWith(norm)) return v;
+  }
+  return null;
 }

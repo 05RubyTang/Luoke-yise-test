@@ -502,7 +502,7 @@ export default function Collection() {
         {/* 活动标题 + 说明 */}
         <div style={{ marginBottom: 10 }}>
           <div className="font-subtitle" style={{ fontSize: 16, fontWeight: 900, color: 'var(--text)', marginBottom: 3 }}>
-            {currentSeason === 'S1' ? 'S1 暗夜时光 · 异色&奇遇' : 'S2 狂欢怪谈 · 异色&奇遇'}
+            {currentSeason === 'S1' ? 'S1 暗夜拾光 · 异色&奇遇' : 'S2 狂欢怪谈 · 异色&奇遇'}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
             {currentSeason === 'S1'

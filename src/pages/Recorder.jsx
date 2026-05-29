@@ -1021,22 +1021,31 @@ export default function Recorder({ planId, navigate }) {
         const isForceWorld = !!plan.forceWorld;
 
         // 判断当前方案是否有家族池保底：
-        // 内置方案：spiritA 在任意方案的 shinies 列表中，说明系统登记了该精灵的家族池
-        // 自定义方案：用户在 shinies 里填了精灵名 → 认为有家族池（用户主动指定了目标精灵）
+        // 家族池规则（三条件）：单果实 + spiritA/B 在 ALL_SHINIES + spiritA/B 也在 plan.shinies
+        // 仪表盘用「是否可能出现家族池」来决定是否渲染家族池进度条：
+        //   - 自定义方案：有目标精灵（shinies 非空）视为可能有家族池（用户自定义，信任用户）
+        //   - 内置方案：单果实 + spiritA/B 在 ALL_SHINIES + 也在 plan.shinies → 有家族池
+        //   - 多果实方案 / forceWorld → 无家族池
+        // 关键：同时要求 spiritA/B 在 plan.shinies 中（条件3），
+        //   防止 S2「恶系方案2」spiritA=恶魔狼（S1有异色但S2无）被误判为有家族池
         const spiritAName = plan.spiritA || '';
         const spiritBName = plan.spiritB || '';
+        const { isSingleFruit: isSingleFruitForFamily } = analyzePlanFruits(plan);
+        // 辅助：spiritName 是否同时在 ALL_SHINIES 且在 plan.shinies 中（与 classifyResultType 条件3对齐）
+        const inAllAndPlanShinies = (spiritName) => {
+          if (!spiritName) return false;
+          const inAll = ALL_SHINIES.includes(spiritName) || ALL_SHINIES.some(k => k.includes(spiritName) || spiritName.includes(k));
+          if (!inAll) return false;
+          // 若 plan.shinies 为空/不存在则不额外过滤（老自定义方案兼容）
+          if (!plan.shinies?.length) return true;
+          return plan.shinies.some(s => s.includes(spiritName) || spiritName.includes(s));
+        };
+        const spiritAInShinies = inAllAndPlanShinies(spiritAName);
+        const spiritBInShinies = inAllAndPlanShinies(spiritBName);
         const hasFamilyPool = plan.custom
-          ? (plan.shinies?.length > 0)  // 自定义方案：有目标精灵即视为有家族池
-          : (spiritAName
-              ? (ALL_SHINIES.includes(spiritAName) || ALL_SHINIES.some(k => k.includes(spiritAName) || spiritAName.includes(k)))
-              : plan.shinies?.length > 0);
-        // spiritB 同理（若存在）
-        const spiritBInPool = plan.custom
-          ? false  // 自定义方案 spiritB 的家族池已由 hasFamilyPool（shinies.length > 0）整体判断
-          : (spiritBName
-              ? (ALL_SHINIES.includes(spiritBName) || ALL_SHINIES.some(k => k.includes(spiritBName) || spiritBName.includes(k)))
-              : false);
-        const showFamilyPool = !isForceWorld && (hasFamilyPool || spiritBInPool || plan.shinies?.length > 0);
+          ? (plan.shinies?.length > 0)   // 自定义方案：有目标精灵即视为可能有家族池
+          : (isSingleFruitForFamily && (spiritAInShinies || spiritBInShinies));  // 内置方案：单果实且 spiritA/B 在 ALL_SHINIES & plan.shinies
+        const showFamilyPool = !isForceWorld && hasFamilyPool;
 
         // 无家族池时：根据果实属性判断精灵的出货池归属
         // fruitAttrId 有值 → 单果/同属混刷 → 精灵属性若与果实属性一致则归属系池，否则世界池
@@ -1222,20 +1231,23 @@ export default function Recorder({ planId, navigate }) {
         }
 
         // 判断是否有家族池（与仪表盘保持一致，重新计算）
+        // 同样使用三条件：单果实 + spiritA/B 在 ALL_SHINIES + 也在 plan.shinies
         const spiritAName = plan.spiritA || '';
         const spiritBName = plan.spiritB || '';
-        // 自定义方案：用户填了 shinies 即视为有家族池；内置方案查 ALL_SHINIES 注册表
+        const inAllAndPlanShiniesCard = (spiritName) => {
+          if (!spiritName) return false;
+          const inAll = ALL_SHINIES.includes(spiritName) || ALL_SHINIES.some(k => k.includes(spiritName) || spiritName.includes(k));
+          if (!inAll) return false;
+          if (!plan.shinies?.length) return true;
+          return plan.shinies.some(s => s.includes(spiritName) || spiritName.includes(s));
+        };
         const hasFamilyPoolCard = plan.custom
           ? (plan.shinies?.length > 0)
-          : (spiritAName
-              ? (ALL_SHINIES.includes(spiritAName) || ALL_SHINIES.some(k => k.includes(spiritAName) || spiritAName.includes(k)))
-              : plan.shinies?.length > 0);
+          : inAllAndPlanShiniesCard(spiritAName);
         const spiritBInPoolCard = plan.custom
           ? false
-          : (spiritBName
-              ? (ALL_SHINIES.includes(spiritBName) || ALL_SHINIES.some(k => k.includes(spiritBName) || spiritBName.includes(k)))
-              : false);
-        const showFamilyPoolCard = hasFamilyPoolCard || spiritBInPoolCard || plan.shinies?.length > 0;
+          : inAllAndPlanShiniesCard(spiritBName);
+        const showFamilyPoolCard = hasFamilyPoolCard || spiritBInPoolCard;
 
         // 无家族池时：判断精灵属性 vs 果实属性，确定出货归属
         const { fruitAttrId: fruitAttrIdCard } = analyzePlanFruits(plan);

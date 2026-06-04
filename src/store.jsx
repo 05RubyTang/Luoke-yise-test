@@ -296,13 +296,11 @@ function reducer(state, action) {
       };
     }
     case 'RECORD_BREAK': {
-      // jelly（果冻/星辰虫）：记录色块供展示，但不增加保底计数
-      const isJelly = action.result === 'jelly';
-
       // ── 三池归属判定 ─────────────────────────────────────────────────────────
-      // 破盾后不论出现原色/污染/奇异血脉/混血血脉，都算触发一次奇遇，均计入对应池保底进度。
+      // 破盾后不论出现原色/污染/奇异血脉/混血血脉/果冻/星辰虫，都算触发一次奇遇，均计入对应池保底进度。
       // 只有「触发失败（逃跑/战败）」和 shiny（已出货）不计入池保底。
-      // jelly（果冻/星辰虫）固定归世界池，不占保底序号（shieldBreakCount 不自增）。
+      // jelly（果冻/星辰虫）固定归世界池，正常自增 shieldBreakCount（是真实破盾事件）。
+      const isJelly = action.result === 'jelly';
       const POOL_CLASSIFIABLE = ['polluted', 'original', 'shiny_blood', 'mixed_blood'];
       let breakPool = null;
       if (POOL_CLASSIFIABLE.includes(action.result) && action.spiritName) {
@@ -329,12 +327,12 @@ function reducer(state, action) {
         ...state,
         // 三池计数不再增量维护，改由 computePoolCounts 从事件流派生
         activeTasks: updateTask(state.activeTasks, action.planId, task => {
-          // jelly 不占保底序号（index 使用当前 count，不自增）
-          newBreak.index = isJelly ? task.shieldBreakCount : task.shieldBreakCount + 1;
+          // jelly 和其他破盾结果一样，正常自增 shieldBreakCount（是真实破盾事件，计入世界池保底）
+          newBreak.index = task.shieldBreakCount + 1;
           return {
             ...task,
             shieldBreaks: [...task.shieldBreaks, newBreak],
-            shieldBreakCount: isJelly ? task.shieldBreakCount : task.shieldBreakCount + 1,
+            shieldBreakCount: task.shieldBreakCount + 1,
           };
         }),
       };
@@ -353,15 +351,13 @@ function reducer(state, action) {
       const undoTask = state.activeTasks.find(t => t.planId === action.planId);
       if (!undoTask || undoTask.shieldBreaks.length === 0) return state;
       const lastBreak = undoTask.shieldBreaks[undoTask.shieldBreaks.length - 1];
-      const isUndoJelly = lastBreak?.result === 'jelly';
-
       return {
         ...state,
         activeTasks: updateTask(state.activeTasks, action.planId, task => ({
           ...task,
           shieldBreaks: task.shieldBreaks.slice(0, -1),
-          // jelly 不占保底计数，撤销时也不减
-          shieldBreakCount: isUndoJelly ? task.shieldBreakCount : task.shieldBreakCount - 1,
+          // jelly 也占保底计数，撤销时正常减 1
+          shieldBreakCount: task.shieldBreakCount - 1,
         })),
       };
     }
@@ -656,8 +652,8 @@ function reducer(state, action) {
       //   - 计算出货池当前已有多少条 break（排除 shiny/failed），写入 offset
       //   - Recorder.jsx 三池进度计算时减去 offset，实现进度归零而不影响显示
       const nextShieldBreaks = resetBreaks ? [] : [...(task.shieldBreaks || [])];
-      // shieldBreakCount：全量 breaks 中非 jelly 的条数（保留完整历史序号）
-      const nextShieldBreakCount = nextShieldBreaks.filter(b => b.result !== 'jelly').length;
+      // shieldBreakCount：全量 breaks 中不含 shiny/failed 的条数（jelly 也算真实破盾，计入保底）
+      const nextShieldBreakCount = nextShieldBreaks.filter(b => b.result !== 'shiny' && b.result !== 'failed').length;
 
       // 计算出货池当前（归零前）拥有多少条有效 break（shiny/failed 不计入池进度）
       const clearedPoolBreakCount = resetBreaks ? 0 : (task.shieldBreaks || []).filter(b => {
@@ -1879,14 +1875,24 @@ export function StoreProvider({ children }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, initialized, userId, syncStatus]);
 
-  // ── 保底同步：页面切到后台 / 用户关闭 Tab 时立即触发一次云端写入 ────────────
-  // 解决「用户记录完数据直接关闭页面，异步写还没发出」的数据丢失场景
+  // ── 保底同步：页面切到后台时立即上传；切回前台时先拉取云端最新再更新 ──────────
+  // hidden：解决「用户记录完数据直接关闭页面，异步写还没发出」的数据丢失场景
+  // visible：解决 iOS Safari 从内存缓存恢复页面时不重新执行 init 的问题，
+  //          页面切回来时主动拉取云端最新数据（其他设备的新记录才能显示出来）
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState === 'hidden') {
         // 读最新的 doUpsert（由持久化 effect 注入，offline 时为 null）
         doSyncNowRef.current?.();
         console.log('[Supabase] visibilitychange → hidden，触发保底同步');
+      } else if (document.visibilityState === 'visible') {
+        // 从后台切回前台：先从云端拉取最新数据（防止 iOS 内存缓存导致数据过旧）
+        const uid = userIdRef.current;
+        if (!uid || !initDoneRef.current) return;
+        console.log('[Supabase] visibilitychange → visible，拉取云端最新数据');
+        hydrateFromCloud(uid, dispatch, getLocalState(), false).catch(err => {
+          console.warn('[Supabase] 切回前台拉取云端数据失败:', err.message);
+        });
       }
     }
     document.addEventListener('visibilitychange', onVisibilityChange);
@@ -2025,30 +2031,48 @@ export function StoreProvider({ children }) {
     attemptReconnectRef.current?.();
   };
 
-  // ── 手动触发一次 Supabase 同步（Profile 页「同步失败，点击重试」按钮调用）──
-  // 无论在线/离线，都先置 pending 给用户即时反馈，再触发实际的云端操作：
-  //   在线 → 直接调 doUpsert 写 Supabase
-  //   离线 → 调 retryOfflineNow 重新尝试连接 Supabase
-  const retrySyncNow = () => {
+  // ── 手动触发一次完整双向同步（先拉取云端，再上传合并结果）─────────────────
+  // 修复：原先只做上传（doUpsert），当本地数据落后于云端时会把旧数据覆盖云端新数据。
+  // 正确流程：hydrate（拉取并合并）→ 持久化 effect 自动触发 upsert（上传合并结果）
+  // 调用场景：Profile 页「同步失败，点击重试」按钮 / 页面切回前台
+  const doFullSync = async () => {
+    const uid = userIdRef.current;
+    if (!uid) { retryOfflineNow(); return; }
     setLastSyncResult({ status: 'pending', time: new Date() });
+    try {
+      await hydrateFromCloud(uid, dispatch, getLocalState(), false);
+      // hydrate 成功后 state 会更新，持久化 effect 会自动上传，无需手动 doUpsert
+      setLastSyncResult({ status: 'success', time: new Date() });
+    } catch (err) {
+      console.warn('[Supabase] 手动双向同步失败:', err.message);
+      setLastSyncResult({ status: 'fail', time: new Date() });
+    }
+  };
+
+  // ── 手动触发一次 Supabase 同步（Profile 页「同步失败，点击重试」按钮调用）──
+  // 在线 → 先拉取云端最新再上传（双向同步，防止覆盖其他设备的新数据）
+  // 离线 → 调 retryOfflineNow 重新尝试连接 Supabase
+  const retrySyncNow = () => {
     if (syncStatus === 'offline') {
+      setLastSyncResult({ status: 'pending', time: new Date() });
       retryOfflineNow();
     } else {
-      doSyncNowRef.current?.();
+      doFullSync();
     }
   };
 
   // ── Profile 主动探查 Supabase 同步状态（进入「我的」主页时调用）────────────
-  // 无论在线/离线，都先置 pending，再触发一次实际的 Supabase 操作，
-  // 让用户看到「同步中…→ 已同步 ✓ / 同步失败」的完整反馈。
-  //   在线 → doSyncNowRef 触发 upsert
+  // 无论在线/离线，都先置 pending，再触发一次实际的 Supabase 操作。
+  // 修复：改为双向同步（先拉取云端最新数据合并后再上传），防止 iOS 切回前台时
+  // 用本地缓存的旧数据覆盖其他设备刚写入的云端新数据。
+  //   在线 → doFullSync（hydrate + 自动 upsert）
   //   离线 → retryOfflineNow 尝试重连 Supabase（成功后自动 upsert）
   const pingSync = () => {
-    setLastSyncResult({ status: 'pending', time: new Date() });
     if (syncStatus === 'offline') {
+      setLastSyncResult({ status: 'pending', time: new Date() });
       retryOfflineNow();
-    } else if (doSyncNowRef.current) {
-      doSyncNowRef.current();
+    } else {
+      doFullSync();
     }
   };
 

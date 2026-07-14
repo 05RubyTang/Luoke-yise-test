@@ -1801,6 +1801,10 @@ export function StoreProvider({ children }) {
   // 供 visibilitychange 等外部调用：触发一次立即云端同步（读最新 state）
   // 由持久化 effect 在条件满足时注入，条件不满足时为 null（offline / 未初始化）
   const doSyncNowRef = useRef(null);
+  // 写云端防抖定时器（3 秒）：连续操作只写最后一次，大幅减少 Supabase IO
+  const syncDebounceTimerRef = useRef(null);
+  // visibilitychange → visible 冷却时间戳：30 秒内不重复拉取云端
+  const lastVisibleHydrateRef = useRef(0);
   // offline 模式下的后台重连：记录重试次数、定时器 ID、当前 attemptReconnect 函数引用
   const offlineRetryCountRef = useRef(0);
   const offlineRetryTimerRef = useRef(null);
@@ -2120,23 +2124,24 @@ export function StoreProvider({ children }) {
     }
     syncRetryCountRef.current = 0;
 
-    // 构建一次上传快照（捕获当前 state / userId / authUserRef，供重试闭包使用）
-    const snapshot = {
-      user_id: userId,
-      device_id: DEVICE_ID,
-      data: buildSlimState(state),
-      completed_tasks_full: buildFullTasks(state),
-      active_tasks_summary: buildActiveTasksSummary(state),
-      ...buildUserMeta(state),
-      ...(authUserRef.current?.email ? { user_email: authUserRef.current.email } : {}),
-    };
-
     // 实际执行上传，失败时按指数退避调度重试（最多 3 次：30s / 60s / 120s）
     // isFirstCall=true：首次调用（非重试），先置 pending 让 Profile 感知同步进行中
+    // 注意：snapshot 在 doUpsert 内部实时构建，确保防抖延迟后拿到最新 state
     function doUpsert(isFirstCall = false) {
       if (isFirstCall) setLastSyncResult({ status: 'pending', time: new Date() });
       // 上传前同步写脏标记，确保页面关闭时数据未丢失可在下次启动时补传
       localStorage.setItem(DIRTY_KEY, 'true');
+      // 实时从 stateRef 读最新 state（防抖延迟期间 state 可能已更新）
+      const latestState = stateRef.current;
+      const snapshot = {
+        user_id: userId,
+        device_id: DEVICE_ID,
+        data: buildSlimState(latestState),
+        completed_tasks_full: buildFullTasks(latestState),
+        active_tasks_summary: buildActiveTasksSummary(latestState),
+        ...buildUserMeta(latestState),
+        ...(authUserRef.current?.email ? { user_email: authUserRef.current.email } : {}),
+      };
       supabase
         .from('user_data')
         .upsert({
@@ -2170,11 +2175,11 @@ export function StoreProvider({ children }) {
         });
     }
 
-    // 把 doUpsert 暴露给 visibilitychange 监听器，以便页面切后台时能主动触发
+    // 把 doUpsert 暴露给 visibilitychange 监听器，以便页面切后台时能主动触发（不受防抖影响）
     doSyncNowRef.current = doUpsert;
 
     // 检查启动时的脏数据补传信号（init() 检测到脏标记时设置）
-    // 此时 initialized=true 且 doSyncNowRef 已注入，可以安全触发补传
+    // 此时 initialized=true 且 doSyncNowRef 已注入，可以安全触发补传（立即执行，不防抖）
     if (pendingDirtySync.current) {
       pendingDirtySync.current = false;
       console.log('[Supabase] 初始化完成，执行脏数据补传');
@@ -2182,13 +2187,26 @@ export function StoreProvider({ children }) {
       return;
     }
 
-    doUpsert(true); // 首次调用，置 pending
+    // ── 防抖写云端：3 秒内连续操作只写最后一次，大幅减少 Supabase IO ──────────
+    // 用户刷取时每次点击都会触发 state 变化，防抖后连续操作合并为一次写入
+    if (syncDebounceTimerRef.current) {
+      clearTimeout(syncDebounceTimerRef.current);
+    }
+    setLastSyncResult({ status: 'pending', time: new Date() }); // 立即置 pending，UI 有反馈
+    syncDebounceTimerRef.current = setTimeout(() => {
+      syncDebounceTimerRef.current = null;
+      doUpsert(false); // 防抖触发，非首次调用（pending 已在上方设置）
+    }, 3000);
 
-    // 组件卸载时清除未执行的重试定时器
+    // 组件卸载时清除未执行的定时器
     return () => {
       if (syncRetryTimerRef.current) {
         clearTimeout(syncRetryTimerRef.current);
         syncRetryTimerRef.current = null;
+      }
+      if (syncDebounceTimerRef.current) {
+        clearTimeout(syncDebounceTimerRef.current);
+        syncDebounceTimerRef.current = null;
       }
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2201,13 +2219,23 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     function onVisibilityChange() {
       if (document.visibilityState === 'hidden') {
-        // 读最新的 doUpsert（由持久化 effect 注入，offline 时为 null）
+        // 切到后台：取消防抖定时器，立即执行一次上传（保底同步，防止数据丢失）
+        if (syncDebounceTimerRef.current) {
+          clearTimeout(syncDebounceTimerRef.current);
+          syncDebounceTimerRef.current = null;
+        }
         doSyncNowRef.current?.();
-        console.log('[Supabase] visibilitychange → hidden，触发保底同步');
+        console.log('[Supabase] visibilitychange → hidden，取消防抖立即同步');
       } else if (document.visibilityState === 'visible') {
-        // 从后台切回前台：先从云端拉取最新数据（防止 iOS 内存缓存导致数据过旧）
+        // 从后台切回前台：30 秒冷却，避免频繁切 app 时密集读取 Supabase
         const uid = userIdRef.current;
         if (!uid || !initDoneRef.current) return;
+        const now = Date.now();
+        if (now - lastVisibleHydrateRef.current < 30_000) {
+          console.log('[Supabase] visibilitychange → visible，冷却中跳过拉取');
+          return;
+        }
+        lastVisibleHydrateRef.current = now;
         console.log('[Supabase] visibilitychange → visible，拉取云端最新数据');
         hydrateFromCloud(uid, dispatch, stateRef.current, false).catch(err => {
           console.warn('[Supabase] 切回前台拉取云端数据失败:', err.message);

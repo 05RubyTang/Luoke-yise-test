@@ -1,6 +1,6 @@
 import { useState, Fragment } from 'react';
 import { useStore } from '../store';
-import { PLANS, ATTR_SHINIES, SEASON_SHINIES, findPlansForSpirit, SPECIAL_FORMS, resolveShinyKey, S1_PLANS, S2_PLANS, SPIRIT_ATTR1, SPIRIT_ATTR2, getPlanFruitsArray } from '../data/plans';
+import { PLANS, ATTR_SHINIES, SEASON_SHINIES, findPlansForSpirit, SPECIAL_FORMS, resolveShinyKey, S1_PLANS, S2_PLANS, S3_PLANS, SPIRIT_ATTR1, SPIRIT_ATTR2, getPlanFruitsArray } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import { getWikiSpiritImg } from '../data/spirits-wiki';
@@ -31,6 +31,8 @@ const ATTR_ICON_FILE = {
   wing:     'attrs/wing.webp',
   dragon:   'attrs/dragon.webp',
   ground:   'attrs/ground.webp',
+  bug:      'attrs/bug.webp',
+  fighting: 'attrs/fighting.webp',
 };
 
 /** 返回精灵属性图标路径数组，按属性1、属性2顺序，最多2个 */
@@ -43,16 +45,17 @@ function getSpiritAttrIcons(name) {
   return result;
 }
 
-// S2 战令精灵列表
+// 各赛季战令精灵列表
 const S1_BATTLE_PASS_SPIRITS = ['疾光千兽', '绒仙子'];
 const S2_BATTLE_PASS_SPIRITS = ['雪怪', '爆焰喷喷'];
+const S3_BATTLE_PASS_SPIRITS = []; // S3 战令精灵，待补充
 
 // 获取指定赛季的精灵列表
 function getSpiritsBySeason(season) {
-  const seasonPlans = season === 'S1' ? S1_PLANS : S2_PLANS;
+  const seasonPlans = season === 'S1' ? S1_PLANS : season === 'S2' ? S2_PLANS : S3_PLANS;
   const seasonShinies = [];
   const attrShinies = [];
-  const battlePassShinies = season === 'S2' ? S2_BATTLE_PASS_SPIRITS : S1_BATTLE_PASS_SPIRITS;
+  const battlePassShinies = season === 'S3' ? S3_BATTLE_PASS_SPIRITS : season === 'S2' ? S2_BATTLE_PASS_SPIRITS : S1_BATTLE_PASS_SPIRITS;
 
   seasonPlans.forEach(plan => {
     if (plan.shinies && plan.shinies.length > 0) {
@@ -433,7 +436,7 @@ const FILTERS = [
 // ─── 主页面 ───────────────────────────────────────────────────────────────────
 export default function Collection() {
   const { state, dispatch } = useStore();
-  const currentSeason = state.currentSeason || 'S2';
+  const currentSeason = state.currentSeason || 'S3';
   const [filter, setFilter] = useState('all');
   const [selected, setSelected] = useState(null);
 
@@ -502,12 +505,14 @@ export default function Collection() {
         {/* 活动标题 + 说明 */}
         <div style={{ marginBottom: 10 }}>
           <div className="font-subtitle" style={{ fontSize: 16, fontWeight: 900, color: 'var(--text)', marginBottom: 3 }}>
-            {currentSeason === 'S1' ? 'S1 暗夜拾光 · 异色&奇遇' : 'S2 狂欢怪谈 · 异色&奇遇'}
+            {currentSeason === 'S1' ? 'S1 暗夜拾光 · 异色&奇遇' : currentSeason === 'S2' ? 'S2 狂欢怪谈 · 异色&奇遇' : 'S3 铅字幻梦 · 异色&奇遇'}
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.7 }}>
             {currentSeason === 'S1'
               ? '属性果实循环产出异色精灵；赛季奇遇精灵需完成第六章赛季任务后刷取'
-              : '单刷专属果实可获得对应异色；赛季奇遇精灵需完成 S2 赛季任务'
+              : currentSeason === 'S2'
+              ? '单刷专属果实可获得对应异色；赛季奇遇精灵需完成 S2 赛季任务'
+              : '单刷专属果实可获得对应异色；赛季奇遇精灵需完成 S3 赛季任务'
             }
           </div>
         </div>
@@ -723,22 +728,36 @@ export default function Collection() {
             <div className="modal-body">
               {/* 头部：头像 + 名字 + 状态 + tag */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, paddingRight: 36 }}>
-                <SpiritAvatar name={selected} obtained={state.spirits[selected]?.obtained} size={60} showName={false} />
+                <SpiritAvatar
+                  name={selected}
+                  obtained={isBattlePassSpirit
+                    ? !!state.battlePassSpirits?.[selected]?.obtained
+                    : !!state.spirits[selected]?.obtained}
+                  size={60}
+                  showName={false}
+                />
                 <div>
                   <div className="font-spirit" style={{ fontSize: 18, fontWeight: 900, marginBottom: 5 }}>
                     {selected}
                   </div>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     {/* 获取状态 */}
-                    <span style={{
-                      display: 'inline-block', fontSize: 11, fontWeight: 700,
-                      padding: '2px 10px', borderRadius: 20,
-                      ...(state.spirits[selected]?.obtained
-                        ? { background: 'var(--success-dim)', color: 'var(--success)', border: '1.5px solid rgba(75,156,70,0.3)' }
-                        : { background: 'var(--card-inner)', color: 'var(--text-muted)', border: '1px solid var(--divider)' })
-                    }}>
-                      {state.spirits[selected]?.obtained ? '✓ 已获得' : '🔒 未获得'}
-                    </span>
+                    {(() => {
+                      const isObtainedInModal = isBattlePassSpirit
+                        ? !!state.battlePassSpirits?.[selected]?.obtained
+                        : !!state.spirits[selected]?.obtained;
+                      return (
+                        <span style={{
+                          display: 'inline-block', fontSize: 11, fontWeight: 700,
+                          padding: '2px 10px', borderRadius: 20,
+                          ...(isObtainedInModal
+                            ? { background: 'var(--success-dim)', color: 'var(--success)', border: '1.5px solid rgba(75,156,70,0.3)' }
+                            : { background: 'var(--card-inner)', color: 'var(--text-muted)', border: '1px solid var(--divider)' })
+                        }}>
+                          {isObtainedInModal ? '✓ 已获得' : '🔒 未获得'}
+                        </span>
+                      );
+                    })()}
                     {/* 类型 tag */}
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20,
@@ -800,6 +819,64 @@ export default function Collection() {
                       </span>
                       <button
                         onClick={() => dispatch({ type: 'UNMARK_BATTLE_PASS_OBTAINED', spiritName: selected })}
+                        style={{
+                          padding: '4px 12px',
+                          border: '1.5px solid rgba(103,93,83,0.25)',
+                          borderRadius: 6,
+                          background: 'var(--card)',
+                          color: 'var(--text-muted)',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        取消标记
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 手动标记功能（普通 & 奇遇异色，非战令） */}
+              {!isBattlePassSpirit && (
+                <div style={{
+                  marginBottom: 16,
+                  padding: '12px',
+                  background: state.spirits[selected]?.obtained
+                    ? 'rgba(75,156,70,0.07)'
+                    : 'rgba(103,93,83,0.05)',
+                  border: state.spirits[selected]?.obtained
+                    ? '1.5px solid rgba(75,156,70,0.25)'
+                    : '1.5px solid rgba(103,93,83,0.15)',
+                  borderRadius: 8,
+                }}>
+                  {!state.spirits[selected]?.obtained ? (
+                    <button
+                      onClick={() => dispatch({ type: 'TOGGLE_SPIRIT', name: selected })}
+                      style={{
+                        width: '100%',
+                        padding: '8px 16px',
+                        border: '1.5px solid rgba(103,170,92,0.4)',
+                        borderRadius: 8,
+                        background: 'linear-gradient(135deg, #5DAD58 0%, #3D8C39 100%)',
+                        color: '#fff',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+                      onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    >
+                      ✓ 手动标记已获得
+                    </button>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#4B9C46' }}>
+                        ✓ 已手动标记为获得
+                      </span>
+                      <button
+                        onClick={() => dispatch({ type: 'TOGGLE_SPIRIT', name: selected })}
                         style={{
                           padding: '4px 12px',
                           border: '1.5px solid rgba(103,93,83,0.25)',

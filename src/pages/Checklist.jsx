@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS, S2_PLANS, SPECIAL_FORMS, resolvePlanIconImg, getPlanFruitsArray } from '../data/plans';
+import { PLANS, SPECIAL_FORMS, resolvePlanIconImg, getPlanFruitsArray } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import FruitTag, { FruitLine } from '../components/FruitTag';
@@ -39,7 +39,6 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
   const [ballAtt, setBallAtt] = useState(_existBst?.att != null ? String(_existBst.att) : '');
 
   const rawPlan = PLANS.find(p => p.id === activePlanId)
-    || S2_PLANS.find(p => p.id === activePlanId)
     || (state.userPlanConfig || []).find(p => p.id === activePlanId);
   // 标准化：自定义方案继承基础属性方案的图标
   const attrBase = rawPlan?.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
@@ -108,8 +107,8 @@ export default function Checklist({ planId, basePlanId, navigate, goBack }) {
     const existingTask = (state.activeTasks || []).find(t => t.planId === plan.id);
     const taskExists = !!existingTask;
 
-    // 从方案对象中取赛季标记：plan.season 统一为 'S1'/'S2' 字符串，fallback 到 currentSeason → 'S1'
-    const planSeason = (typeof plan.season === 'string' && plan.season) ? plan.season : (state.currentSeason || 'S1');
+    // 从方案对象中取赛季标记：plan.season 统一为 'S1'/'S2'/'S3' 字符串，fallback 到 currentSeason → 'S3'
+    const planSeason = (typeof plan.season === 'string' && plan.season) ? plan.season : (state.currentSeason || 'S3');
 
     if (ballMode === 'byType') {
       const adv = parseInt(ballAdv.trim(), 10) || 0;

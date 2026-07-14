@@ -4,6 +4,7 @@ import { useStore } from '../store';
 const base = import.meta.env.BASE_URL;
 import { PLANS, getShinisByAttr, getPlanFruitsArray } from '../data/plans';
 import { S2_PLANS } from '../data/seasons/s2Plans';
+import { S3_PLANS } from '../data/plans';
 import PlanCard from '../components/PlanCard';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -474,7 +475,7 @@ function getPlanAttr(plan) {
 /* ─── 主页面 ─────────────────────────────────────────────────────────────────── */
 export default function PlanList({ navigate, mode = 'library', goBack }) {
   const { state } = useStore();
-  const currentSeason = state.currentSeason || 'S2';
+  const currentSeason = state.currentSeason || 'S3';
   const [filter, setFilter] = useState('all');
   // 已确认生效的筛选状态（library 模式）
   const [fruitFilter, setFruitFilter] = useState('all'); // 'all' | 'ready' | 'missing'
@@ -503,7 +504,7 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
 
   // ─── 按赛季分发方案 ───────────────────────────────────────────────────────
   // 解析任务有效赛季（与 Home.jsx resolveTaskSeason 逻辑一致）
-  const allBuiltinPlans = [...PLANS, ...S2_PLANS];
+  const allBuiltinPlans = [...PLANS, ...S2_PLANS, ...S3_PLANS];
   const resolveActiveSeason = (task) => {
     const plan = allBuiltinPlans.find(p => p.id === task.planId)
       || (state.userPlanConfig || []).find(p => p.id === task.planId);
@@ -535,12 +536,17 @@ export default function PlanList({ navigate, mode = 'library', goBack }) {
     attrPlans         = PLANS.filter(p => !p.season && !p.singleSpirit && !(p.noShiny && p.attrId) && !p.worldPlan);
     seasonPlans       = PLANS.filter(p => p.season === true);
     singleSpiritPlans = PLANS.filter(p => p.singleSpirit);
-  } else {
-    // S2
+  } else if (currentSeason === 'S2') {
     worldPlansList    = S2_PLANS.filter(p => p.category === 'attr' && p.forceWorld);
     attrPlans         = S2_PLANS.filter(p => p.category === 'attr' && !p.forceWorld);
     seasonPlans       = S2_PLANS.filter(p => p.category === 'seasonal');
     singleSpiritPlans = S2_PLANS.filter(p => p.category === 'single');
+  } else {
+    // S3 铅字幻梦
+    worldPlansList    = S3_PLANS.filter(p => p.category === 'attr' && p.forceWorld);
+    attrPlans         = S3_PLANS.filter(p => p.category === 'attr' && !p.forceWorld);
+    seasonPlans       = S3_PLANS.filter(p => p.category === 'seasonal');
+    singleSpiritPlans = S3_PLANS.filter(p => p.category === 'single');
   }
 
   // 已拥有果实

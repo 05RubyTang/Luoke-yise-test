@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store';
-import { PLANS, S2_PLANS, POOL_TYPE_CONFIG, resolvePlanIconImg } from '../data/plans';
+import { PLANS, POOL_TYPE_CONFIG, resolvePlanIconImg } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 
@@ -45,7 +45,6 @@ function Row({ label, children }) {
 export default function Report({ planId, spiritName, resultType, navigate }) {
   const { state, dispatch } = useStore();
   const rawPlan = PLANS.find(p => p.id === planId)
-    || S2_PLANS.find(p => p.id === planId)
     || (state.userPlanConfig || []).find(p => p.id === planId);
   // 标准化：自定义方案继承基础属性方案的图标
   const attrBase = rawPlan?.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
@@ -517,7 +516,7 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
                 📖 保存并查看
             </button>
 
-            {/* 继续刷取：默认只清出货池，可选三池全清 */}
+            {/* 继续刷取：仅清出货池，其余池进度保留 */}
             <div style={{
               border: '1.5px solid rgba(103,93,83,0.2)',
               borderRadius: 12, overflow: 'hidden',
@@ -538,37 +537,19 @@ export default function Report({ planId, spiritName, resultType, navigate }) {
                       : '世界池归零，家族池 / 系别池进度保留'}
                 </div>
               </div>
-              {/* 两个选项按钮 */}
-              <div style={{ display: 'flex' }}>
-                <button
-                  onClick={() => handleContinue(false)}
-                  style={{
-                    flex: 1, padding: '11px 8px',
-                    border: 'none', borderRight: '1px solid rgba(103,93,83,0.15)',
-                    background: '#fff',
-                    fontSize: 12, fontWeight: 800, color: '#2B6A2E',
-                    fontFamily: 'var(--font-body)', cursor: 'pointer',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  ▶ 继续刷取（推荐）<br />
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)' }}>仅清空出货池进度</span>
-                </button>
-                <button
-                  onClick={() => handleContinue(true)}
-                  style={{
-                    flex: 1, padding: '11px 8px',
-                    border: 'none',
-                    background: '#fff',
-                    fontSize: 12, fontWeight: 800, color: '#C8351A',
-                    fontFamily: 'var(--font-body)', cursor: 'pointer',
-                    lineHeight: 1.4,
-                  }}
-                >
-                  🗑️ 三池全清<br />
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-muted)' }}>重新从 0 开始</span>
-                </button>
-              </div>
+              <button
+                onClick={() => handleContinue(false)}
+                style={{
+                  width: '100%', padding: '11px 8px',
+                  border: 'none',
+                  background: '#fff',
+                  fontSize: 12, fontWeight: 800, color: '#2B6A2E',
+                  fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  lineHeight: 1.4,
+                }}
+              >
+                ▶ 继续刷取
+              </button>
             </div>
           </div>
         </div>

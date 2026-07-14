@@ -180,7 +180,7 @@ function FruitInput({ value, onChange, placeholder, required, candidates }) {
       />
       {open && suggestions.length > 0 && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+          position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, right: 0,
           background: '#FBF7EC',
           border: '1.5px solid var(--card-border)',
           borderRadius: 10,
@@ -451,8 +451,8 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
   const [fruitA, setFruitA]   = useState('');
   const [fruitB, setFruitB]   = useState('');
   const [shiniesRaw, setShiniesRaw] = useState(''); // 逗号分隔的精灵名
-  // 归属赛季：用户明确选择，默认跟随当前 Tab 的赛季
-  const [planSeason, setPlanSeason] = useState(state.currentSeason || 'S2');
+  // 归属赛季：用户明确选择，默认跟随当前 Tab 的赛季（兜底 'S3'）
+  const [planSeason, setPlanSeason] = useState(state.currentSeason || 'S3');
 
   // ── 咕噜球库存 state（与 Checklist.jsx 内置方案保持一致）──────────────────
   // 仅在 saveOnly=false（即从首页「开始新刷取」入口进入需立即开刷）时使用
@@ -671,8 +671,12 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
           {[
             { key: 'S1', label: '🌙 S1 赛季' },
             { key: 'S2', label: '🎪 S2 赛季' },
+            { key: 'S3', label: '📖 S3 赛季' },
           ].map(({ key, label }) => {
             const active = planSeason === key;
+            const activeStyle = key === 'S3'
+              ? { background: 'rgba(123,31,162,0.85)', color: '#FBF7EC' }
+              : { background: '#2B2A2E', color: '#FBF7EC' };
             return (
               <button
                 key={key}
@@ -680,8 +684,7 @@ export default function CustomChecklist({ navigate, goBack, saveOnly = false }) 
                 style={{
                   flex: 1, padding: '6px 0',
                   borderRadius: 6, border: 'none',
-                  background: active ? '#2B2A2E' : 'transparent',
-                  color: active ? '#FBF7EC' : 'var(--text-muted)',
+                  ...(active ? activeStyle : { background: 'transparent', color: 'var(--text-muted)' }),
                   fontSize: 12, fontWeight: active ? 800 : 600,
                   fontFamily: 'var(--font-body)', cursor: 'pointer',
                   transition: 'all 0.15s',

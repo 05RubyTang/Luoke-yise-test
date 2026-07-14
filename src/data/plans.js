@@ -3,6 +3,7 @@
 
 import { SEASONS } from './seasons.js';
 import { S1_PLANS, S2_PLANS } from './seasons/index.js';
+// S3 待上线，暂不引入；上线时改为：import { S1_PLANS, S2_PLANS, S3_PLANS } from './seasons/index.js';
 import { getPlanFruitsArray } from './common/getPlanFruitsArray.js';
 
 const base = import.meta.env.BASE_URL;
@@ -13,13 +14,19 @@ const base = import.meta.env.BASE_URL;
 export { S1_PLANS, S2_PLANS };
 export { getPlanFruitsArray };
 
-// ─── 合并 S1 和 S2 方案 ─────────────────────────────────────────────────
+// S3 待上线，暂用空数组占位，避免各页面 import S3_PLANS 报错
+// S3 上线时：删除此行，改为从 seasons/index.js 导出真实数据
+export const S3_PLANS = [];
+
+// ─── 合并 S1、S2 方案（S3 上线时加入 ...S3_PLANS） ──────────────────────────
 export const PLANS = [...S1_PLANS, ...S2_PLANS];
+// S3 上线时改为：export const PLANS = [...S1_PLANS, ...S2_PLANS, ...S3_PLANS];
 
 // ─── 属性 ID 集合（用于判断是否属于"属性系"池子） ────────────────────────────
 const BASE_IDS = new Set([
   'fire', 'ice', 'electric', 'phantom', 'grass', 'evil', 'ghost', 'mech', 'light', 'light_fluffy',
   'water', 'cute', 'normal', 'poison',  // S2 新增普通系、毒系
+  // S3 上线时取消注释：'ground', 'bug', 'fighting',
 ]);
 
 // ─── 属性 ID → 中文属性名映射（用于三池进度标签展示） ─────────────────────────
@@ -40,6 +47,9 @@ export const ATTR_LABEL = {
   poison:      '毒系',
   wing:        '翼系',
   dragon:      '龙系',
+  ground:      '地系',   // S3 新增
+  bug:         '虫系',   // S3 新增
+  fighting:    '武系',   // S3 新增
 };
 
 // ─── 果实名 → 属系 ID 映射 ─────────────────────────────────────────────────
@@ -87,19 +97,19 @@ export const FRUIT_ATTR = {
   '灵狐果实':      'fire',
   '嘟嘟煲果实':    'poison',
   '幽影树果实':    'ghost',
-  '小丑公爵果实':  'evil',
+  '小丑豆豆果实':  'evil',    // 小丑豆豆→小丑兔→小丑公爵
   '小鼓象果实':    'mech',
-  // '音碟吼果实': 'normal',  // 果实暂未上线，待游戏更新后取消注释
-  '烟花伯爵果实':  'fire',
-  '帅帅魔偶果实':  'phantom',
+  '猴麦仔果实':    'normal',  // 猴麦仔→音碟吼（普通+机械双属，主属普通系）
+  '烟花团果实':    'fire',    // 烟花团→烟花图案→烟花伯爵（火+毒双属，主属火系）
+  '牵线木偶果实':  'phantom', // 牵线木偶→帅帅魔偶
   '炫光迪迪果实':  'light',
   '加油海葵果实':  'water',
-  '咕德帽帽果实':  'ghost',
+  '咕咕帽果实':    'ghost',   // 咕咕帽→咕德帽帽
   // S2 attr 混刷方案使用的果实（补全，防止编辑器显示「部分果实属系未识别」）
   '彩蝶鲨果实':    'water',   // 水系混刷
   '板板壳果实':    'water',   // 水泡壳的游戏内别称（同一精灵）
   '月牙雪熊果实':  'ice',     // 熊狼混刷（S1 精灵，S2 仍可作果实用）
-  '乌拉怪果实':    'evil',    // 小夜/小丑公爵混刷
+  '乌拉怪果实':    'evil',    // 小夜/小丑豆豆混刷
   '锤头鹳果实':    'wing',    // 翼系
   '奇丽花果实':    'grass',   // 草系混刷
   '蹦跳花果实':    'grass',   // 草系混刷
@@ -119,6 +129,32 @@ export const FRUIT_ATTR = {
   '缇塔果实':      'mech',    // 机械系混刷（机械方方果+缇塔果）
   '水泡壳果实':    'water',   // 水系混刷（锤头鹳果+水泡壳果）
   '幽星光果实':    'phantom', // 幻系混刷（粉星仔果+幽星光果，幽星光为暮星辰同家族进化前形态）
+  '噼啪鸟果实':    'electric',// 电系单果（噼啪鸟电+翼双属，无异色，进电系池出炫光迪迪）
+  // S3「铅字幻梦」赛季果实（果实名 = 家族最底形态 + 果实；与 S1 家族严格区分）
+  // ── 赛季常驻异色 ──────────────────────────────────────────────────────────
+  '海盔虫果实':    'water',   // 千棘盔（水系+毒系，水系为主属）；海盔虫→刺盔虫→千棘盔
+  '伊贝儿果实':    'grass',   // 伊贝粉粉（草系）；伊贝儿→伊贝粉粉（2 阶）
+  '斑斑果实':      'wing',    // 斑枭（翼系）；斑斑→斑枭（2 阶，与 S1 空空颅家族无关，独立家族）
+  '地鼠果实':      'ground',  // 地鼠（地系）；地鼠本身即为家族最底形态
+  '可立鸡果实':    'fire',    // 绅士鸡（火系+武系，火系为主属）；可立鸡→晕晕鸡→武者鸡→绅士鸡
+  '小草虫果实':    'bug',     // 花衣蝶（虫系+草系，虫系为主属）；小草虫→草衣虫→花衣蝶
+  '小鹬果实':      'wing',    // 高脚鹬（翼系）；小鹬→鄙目鹬→高脚鹬
+  '豆丁鱼果实':    'water',   // 龙鱼（水系+龙系，水系为主属）；豆丁鱼→快鳍鱼→龙鱼
+  // ── 赛季奇遇异色 ──────────────────────────────────────────────────────────
+  '蜜果骸果实':    'ghost',   // 幽系+草系（幽系为主属）
+  '栗鼠果实':      'poison',  // 壳栗丝鼠；栗鼠→壳栗丝鼠
+  '稻草人果实':    'cute',    // 萌系+草系（萌系为主属）
+  '蝴蝶陶陶果实':  'cute',    // 蝴蝶陶陶为底形态；蝴蝶陶陶→铆钉毛毛→徘徊爪爪
+  '十字蝌蚪果实':  'water',   // 深渊蛙；十字蝌蚪→十字蛙→深渊蛙
+  '卡波果实':      'evil',    // 卡拉波斯；卡波→卡拉波斯
+  '卡拉果实':      'evil',    // 兼容旧名（卡拉→卡拉波斯 已改为 卡波→卡拉波斯）
+  '苞米仔果实':    'grass',   // 草系
+  '守夜烛果实':    'fire',    // 火系+机械系（火系为主属）
+  // ── 赛季战令异色 ──────────────────────────────────────────────────────────
+  '足尖元件果实':  'mech',    // 机械系；足尖元件→离心舞者（战令礼包专属）
+  '咬咬小子果实':  'mech',    // 机械系；咬咬小子→胡桃王子（战令礼包专属）
+  '离心舞者果实':  'mech',    // 兼容旧名
+  '胡桃王子果实':  'mech',    // 兼容旧名
 };
 
 // ─── 精灵名 → 属性2 ID 映射（双属性精灵的第2属性，仅用于出货范围判断） ─────────
@@ -145,6 +181,18 @@ export const SPIRIT_ATTR2 = {
   '炫光迪迪': 'electric',// 光系+电系
   '加油海葵': 'cute',    // 水系+萌系
   '爆焰喷喷': 'dragon',  // 火系+龙系（战令）
+  '噼啪鸟':   'wing',    // 电系+翼系（第2属性翼系）
+  // S3 双属性精灵
+  '千棘盔':   'poison',  // 水系+毒系
+  '绅士鸡':   'fighting',// 火系+武系（S3 新属系）
+  '花衣蝶':   'grass',   // 虫系+草系
+  '龙鱼':     'dragon',  // 水系+龙系
+  '半朽蜜果灵':'grass',  // 幽系+草系
+  '稻草守护者':'grass',  // 萌系+草系
+  '蝴蝶陶陶': 'poison',  // 萌系+毒系
+  '深渊蛙':   'fighting',// 水系+武系（S3 新属系）
+  '流明坎德拉':'mech',   // 火系+机械系
+  '离心舞者': 'phantom', // 机械系+幻系（战令）
 };
 
 // ─── 精灵名 → 属性1 ID 映射（4.23后双属精灵只按属性1计池） ──────────────────
@@ -161,6 +209,8 @@ export const SPIRIT_ATTR1 = {
   '双灯鱼':   'electric',
   '哭哭菇':   'phantom',
   '粉星仔':   'phantom',
+  '幽星光':   'phantom', // 幻系（暮星辰同家族的进化前形态，S2 幻系混刷方案 spiritB）
+  '暮星辰':   'phantom', // 幻系（幽星光的进化后形态，避免用户改名后误命中「星辰虫」等）
   '格兰种子': 'grass',
   '奇丽草':   'grass',
   '小夜':     'evil',
@@ -224,6 +274,30 @@ export const SPIRIT_ATTR1 = {
   '缇塔':     'mech',     // 机械系混刷（机械方方果+缇塔果）果实来源
   '水泡壳':   'water',    // 水系混刷（锤头鹳果+水泡壳果）果实来源
   '板板壳':   'water',    // 水泡壳的游戏内别称（同一精灵）
+  // 噼啪鸟：电+翼双属，自身无异色，作为庇护所果实使用时污染噼啪鸟应计入电系池
+  '噼啪鸟':   'electric', // 电系（第1属性），触发噩梦 → 电系池 +1
+  // S3「铅字幻梦」赛季精灵
+  // ── 赛季常驻异色 ──────────────────────────────────────────────────────────
+  '千棘盔':   'water',    // 水系+毒系（水系为主属）
+  '伊贝粉粉': 'grass',    // 草系
+  '斑枭':     'wing',     // 翼系
+  '地鼠':     'ground',   // 地系（S3 新属系）
+  '绅士鸡':   'fire',     // 火系+武系（火系为主属）
+  '花衣蝶':   'bug',      // 虫系+草系（虫系为主属，S3 新属系）
+  '高脚鹬':   'wing',     // 翼系
+  '龙鱼':     'water',    // 水系+龙系（水系为主属）
+  // ── 赛季奇遇异色 ──────────────────────────────────────────────────────────
+  '半朽蜜果灵':'ghost',   // 幽系+草系（幽系为主属）
+  '壳栗丝鼠': 'poison',   // 毒系
+  '稻草守护者':'cute',    // 萌系+草系（萌系为主属）
+  '蝴蝶陶陶': 'cute',     // 萌系+毒系（萌系为主属）
+  '深渊蛙':   'water',    // 水系+武系（水系为主属）
+  '卡拉波斯': 'evil',     // 恶系
+  '炮米花':   'grass',    // 草系
+  '流明坎德拉':'fire',    // 火系+机械系（火系为主属）
+  // ── 赛季战令异色 ──────────────────────────────────────────────────────────
+  '离心舞者': 'mech',     // 机械系+幻系（机械系为主属，战令礼包专属）
+  '胡桃王子': 'mech',     // 机械系（战令礼包专属）
 };
 
 // ─── 按属性 ID 获取所有异色精灵 ──────────────────────────────────────────────
@@ -270,6 +344,28 @@ export const ALL_SHINIES = [...new Set(PLANS.flatMap(p => p.shinies))].filter(Bo
 // key：用户可能输入的非异色精灵名（进化前/后形态、别称）
 // value：系统内登记的目标异色精灵名（方案 shinies 里的标准名）
 export const SPIRIT_FAMILY_MAP = {
+  // ── S3 常驻异色进化链 ─────────────────────────────────────────
+  '刺盔虫':   '千棘盔',     // 刺盔虫（进化前）→ 千棘盔（S3 水系）
+  '海盔虫':   '千棘盔',     // 海盔虫（进化前）→ 千棘盔（S3 水系）
+  '千棘海针': '千棘盔',     // 千棘海针（进化中间）→ 千棘盔
+  '伊贝儿':   '伊贝粉粉',   // 伊贝儿（进化前）→ 伊贝粉粉（S3 草系）
+  '夜枭':     '斑枭',       // 夜枭（进化前）→ 斑枭（S3 翼系）
+  '遁鼠':     '地鼠',       // 遁鼠（进化后）→ 目标异色是地鼠（进化前）
+  '遁地鼠':   '地鼠',       // 遁地鼠（进化后）→ 目标异色是地鼠（进化前）
+  '晕晕鸡':   '绅士鸡',     // 晕晕鸡（进化前）→ 武者鸡 → 绅士鸡（S3 火系）
+  '武者鸡':   '绅士鸡',     // 武者鸡（进化中间）→ 绅士鸡
+  '化蝶':     '花衣蝶',     // 化蝶（进化前）→ 花衣蝶（S3 虫/草系）
+  '小鹬':     '高脚鹬',     // 小鹬（进化前）→ 鄙目鹬 → 高脚鹬（S3 翼系）
+  '鄙目鹬':   '高脚鹬',     // 鄙目鹬（进化中间）→ 高脚鹬
+  '号儿鱼':   '龙鱼',       // 号儿鱼（进化前）→ 快鳍鱼 → 龙鱼（S3 水系）
+  '快鳍鱼':   '龙鱼',       // 快鳍鱼（进化中间）→ 龙鱼
+  '卡波':     '卡拉波斯',   // 卡波（进化前）→ 卡拉波斯（S3 恶系）
+  '卡拉':     '卡拉波斯',   // 兼容旧名（卡拉→卡拉波斯）
+  '苞米仔':   '炮米花',     // 苞米仔（进化前）→ 炮米花（S3 草系）
+  '守夜烛':   '流明坎德拉', // 守夜烛（进化前）→ 流明坎德拉（S3 火/机械）
+  // ── S3 战令异色进化链 ─────────────────────────────────────────
+  '咬咬小子': '胡桃王子',   // 咬咬小子（进化前）→ 胡桃王子（S3 战令）
+  '足尖元件': '离心舞者',   // 足尖元件（进化前）→ 离心舞者（S3 战令）
   // ── S2 奇遇精灵进化链 ─────────────────────────────────────────
   '咕咕帽':   '咕德帽帽',   // 咕咕帽 → 咕德帽帽
   '小丑豆豆': '小丑公爵',   // 小丑豆豆 → 小丑兔 → 小丑公爵
@@ -355,6 +451,14 @@ function lookupAttr(spiritName) {
   for (const [k, v] of Object.entries(SPIRIT_ATTR1)) {
     if (fuzzyMatch(k, spiritName)) return v;
   }
+  // 兜底：查用户运行时注入的精灵属性（自定义方案 spiritX）
+  if (_USER_SPIRIT_ATTR[spiritName]) return _USER_SPIRIT_ATTR[spiritName];
+  for (const [k, v] of Object.entries(_USER_SPIRIT_ATTR)) {
+    if (normalize(k) === nq) return v;
+  }
+  for (const [k, v] of Object.entries(_USER_SPIRIT_ATTR)) {
+    if (fuzzyMatch(k, spiritName)) return v;
+  }
   return null;
 }
 
@@ -375,12 +479,19 @@ function lookupAttr2(spiritName) {
 export function getPlanAttrId(plan) {
   if (!plan) return null;
   const ALL_BASE = new Set([
-    'fire','ice','electric','phantom','grass','evil','ghost','mech','light','water','cute','normal','poison'
+    'fire','ice','electric','phantom','grass','evil','ghost','mech','light','water','cute','normal','poison',
+    'ground','bug','fighting','dragon', // S3 新增属系
+    'wing',                             // 翼系（已有）
   ]);
   if (ALL_BASE.has(plan.id)) return plan.id;
   if (plan.attrId && ALL_BASE.has(plan.attrId)) return plan.attrId;
   const m = (plan.iconImg || '').match(/attrs\/(\w+)\.png/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // 兜底：从方案的果实属性推导（适用于自定义方案没有 attrId/iconImg 的情况）
+  // 只有单属性（同属果实）方案才能明确归入某个系别池
+  const { isSameAttr, fruitAttrId } = analyzePlanFruits(plan);
+  if (isSameAttr && fruitAttrId && ALL_BASE.has(fruitAttrId)) return fruitAttrId;
+  return null;
 }
 
 /**
@@ -710,7 +821,7 @@ export function resolveShinyKey(spiritName) {
  * 多个进行中 task 并行时取最大值。
  *
  * ── Jelly（果冻/星辰虫）────────────────────────────────────────────────────
- * jelly 固定 pool='world'，计入世界池保底（不占 shieldBreakCount 序号），
+ * jelly 固定 pool='world'，计入世界池保底（也占 shieldBreakCount 序号，是真实破盾事件），
  * 跟随 worldCutoff 截断点规则。
  *
  * @param {string} [season] - 当前赛季（'S1'|'S2'）
@@ -725,6 +836,10 @@ export function resolveTaskSeasonFromPlans(task, allPlans) {
   return task.season || null;
 }
 
+// 各赛季开始日期（用于无 season 字段时按完成时间判断归属）
+const S2_START_DATE = SEASONS.S2.startDate; // '2026-05-15'
+// S3 上线时取消注释：const S3_START_DATE = SEASONS.S3.startDate;
+
 export function computePoolCounts(activeTasks, completedTasks, allPlans, season) {
   // 赛季过滤：只保留同赛季的已完成任务
   // 用方案的 season 优先，避免 task.season 历史写错（如 S2 方案但 task.season='S1'）
@@ -732,7 +847,16 @@ export function computePoolCounts(activeTasks, completedTasks, allPlans, season)
     if (!t || t.resultType === 'abandoned') return false;
     if (season) {
       const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
-      if (effectiveSeason && effectiveSeason !== season) return false;
+      if (effectiveSeason) {
+        // 能识别出赛季 → 直接比较
+        if (effectiveSeason !== season) return false;
+      } else {
+        // 无法识别赛季（自定义方案无 season 字段，且 task.season 也为空）
+        // → 按 completedAt 时间判断：S2 期间归 S2，其余归 S1
+        // S3 上线时加回：(S3_START_DATE && t.completedAt && t.completedAt >= S3_START_DATE) ? 'S3' :
+        const resolvedSeason = (t.completedAt && t.completedAt >= S2_START_DATE) ? 'S2' : 'S1';
+        if (resolvedSeason !== season) return false;
+      }
     }
     return true;
   });
@@ -780,8 +904,13 @@ export function computePoolCounts(activeTasks, completedTasks, allPlans, season)
       const cutoff = planAttrId ? attrCutoffByAttr[planAttrId] : null;
       // break.time 早于截断点 → 已被清零，跳过；无截断点或晚于截断点 → 计入
       if (!cutoff || !br.time || br.time > cutoff) {
-        if (planAttrId) attrPools[planAttrId] = (attrPools[planAttrId] || 0) + 1;
-        else worldPool++; // 无法识别属性时归入世界池
+        if (planAttrId) {
+          attrPools[planAttrId] = (attrPools[planAttrId] || 0) + 1;
+        } else {
+          // 无法识别属性时归入世界池（兜底），同时应用世界池截断点
+          // 避免自定义方案 attrId 缺失时，属系 break 绕过 worldCutoff 虚高世界池
+          if (!worldCutoff || !br.time || br.time > worldCutoff) worldPool++;
+        }
       }
     } else { // 'world'（含 jelly，jelly 的 pool 固定为 'world'）
       if (!worldCutoff || !br.time || br.time > worldCutoff) worldPool++;
@@ -789,11 +918,13 @@ export function computePoolCounts(activeTasks, completedTasks, allPlans, season)
   };
 
   // 进行中的任务（仅统计当前赛季，防止跨赛季污染）
-  // 用方案的 season 优先于 task.season，避免历史数据写错导致 S2 任务被误过滤
+  // 用方案的 season 优先于 task.season，避免历史数据写错导致任务被误过滤
   (activeTasks || []).filter(t => {
     if (!season) return true;
     const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
-    return !effectiveSeason || effectiveSeason === season;
+    // 无法识别赛季的任务/方案统一归入当前默认赛季 S2（S3 上线后改为 'S3'）
+    const resolvedSeason = effectiveSeason || 'S2';
+    return resolvedSeason === season;
   }).forEach(task => {
     const plan = allPlans.find(p => p.id === task.planId);
     const planAttrId = getPlanAttrId(plan);
@@ -935,48 +1066,135 @@ export function resolvePlanIconImg(plan, attrBase) {
 }
 
 // ─── 赛季推断：根据精灵名 / 方案 shinies 推断赛季归属 ──────────────────────────
-// S2 精灵集合（从 S2_PLANS 的所有 shinies 提取，运行时一次性构建）
+// S2 精灵集合（从各赛季 PLANS 的 shinies 提取，运行时一次性构建）
 const S2_SPIRIT_SET = new Set(S2_PLANS.flatMap(p => p.shinies || []));
+// S3 上线时取消注释：const S3_SPIRIT_SET = new Set(S3_PLANS.flatMap(p => p.shinies || []));
 
 /**
  * 推断单只精灵的赛季归属。
  * 命中 S2_SPIRIT_SET → 'S2'；否则 → 'S1'。
+ * S3 上线时加回：命中 S3_SPIRIT_SET → 'S3'
  * 无法识别（空名）→ null。
  */
 export function inferSpiritSeason(spiritName) {
   if (!spiritName) return null;
-  return S2_SPIRIT_SET.has(spiritName.trim()) ? 'S2' : 'S1';
+  const name = spiritName.trim();
+  // S3 上线时加回：if (S3_SPIRIT_SET.has(name)) return 'S3';
+  if (S2_SPIRIT_SET.has(name)) return 'S2';
+  return 'S1';
 }
 
 /**
  * 推断方案的赛季归属（用于存量迁移 / 方案卡片展示）。
- * 策略：对方案 shinies 逐一判断，S2 数量 > 半数 → 'S2'，否则 → 'S1'。
+ * 策略：对方案 shinies 逐一判断，S2 数量 > 半数 → 'S2'；否则 → 'S1'。
+ * S3 上线时加回 S3 判断逻辑。
  * 无 shinies 或 shinies 为空数组 → null（不强制标记，让用户手动选）。
  */
 export function inferPlanSeason(plan) {
   const shinies = plan?.shinies;
   if (!shinies || shinies.length === 0) return null;
+  // S3 上线时加回：const s3Count = shinies.filter(n => S3_SPIRIT_SET.has(n)).length;
   const s2Count = shinies.filter(n => S2_SPIRIT_SET.has(n)).length;
-  return s2Count > shinies.length / 2 ? 'S2' : 'S1';
+  // S3 上线时加回：if (s3Count > shinies.length / 2) return 'S3';
+  if (s2Count > shinies.length / 2) return 'S2';
+  return 'S1';
 }
 
 // ─── 存量精灵名模糊纠偏 ───────────────────────────────────────────────────────
 // 候选精灵名：SPIRIT_ATTR1 所有键（含属性精灵）+ ALL_SHINIES（含出货精灵），去重合并
-const _FUZZY_SPIRIT_POOL = (() => {
-  const seen = new Set();
-  const result = [];
-  const addName = n => { if (n && !seen.has(n)) { seen.add(n); result.push(n); } };
+// _FUZZY_SPIRIT_POOL 使用 Set 管理，支持运行时动态注入用户自定义精灵名
+const _FUZZY_POOL_SET = new Set();
+const _FUZZY_SPIRIT_POOL = [];     // 保持数组形式供 fuzzyResolveSpiritName 遍历
+
+// 运行时扩展的 SPIRIT_ATTR1 副本（不污染原静态对象）
+const _USER_SPIRIT_ATTR = {};      // { spiritName: attrId }
+
+// 初始化：把静态数据写入可扩展池
+;(() => {
+  const addName = n => {
+    if (n && !_FUZZY_POOL_SET.has(n)) { _FUZZY_POOL_SET.add(n); _FUZZY_SPIRIT_POOL.push(n); }
+  };
   Object.keys(SPIRIT_ATTR1).forEach(addName);
   ALL_SHINIES.forEach(addName);
-  return result;
 })();
+
+/**
+ * 运行时注入用户自定义精灵（名称 + 属性）到模糊纠偏候选池。
+ * 调用时机：userPlanConfig 初始化或变化时（由 StoreProvider 的 useEffect 触发）。
+ * 幂等：已存在于静态 SPIRIT_ATTR1 的精灵不会被用户数据覆盖；重复注入同名精灵安全。
+ *
+ * @param {Array<{ name: string, attrId?: string }>} entries
+ */
+export function registerUserSpirits(entries) {
+  if (!Array.isArray(entries)) return;
+  entries.forEach(({ name, attrId }) => {
+    if (!name) return;
+    // 加入模糊纠偏候选池（去重）
+    if (!_FUZZY_POOL_SET.has(name)) {
+      _FUZZY_POOL_SET.add(name);
+      _FUZZY_SPIRIT_POOL.push(name);
+    }
+    // 注入属性（不覆盖内置 SPIRIT_ATTR1 的精灵属性）
+    if (attrId && !Object.prototype.hasOwnProperty.call(SPIRIT_ATTR1, name)) {
+      _USER_SPIRIT_ATTR[name] = attrId;
+    }
+  });
+}
+
+/**
+ * 运行时查询精灵属性（内置 + 用户注入，优先内置）
+ * 供 classifyPool / lookupAttr 等函数使用的统一入口。
+ */
+export function lookupAttrRuntime(spiritName) {
+  if (!spiritName) return null;
+  // 先精确匹配内置
+  if (SPIRIT_ATTR1[spiritName]) return SPIRIT_ATTR1[spiritName];
+  // 再精确匹配用户注入
+  if (_USER_SPIRIT_ATTR[spiritName]) return _USER_SPIRIT_ATTR[spiritName];
+  // 模糊匹配内置
+  const nq = normalize(spiritName);
+  for (const [k, v] of Object.entries(SPIRIT_ATTR1)) {
+    if (normalize(k) === nq) return v;
+  }
+  for (const [k, v] of Object.entries(SPIRIT_ATTR1)) {
+    if (fuzzyMatch(k, spiritName)) return v;
+  }
+  // 模糊匹配用户注入
+  for (const [k, v] of Object.entries(_USER_SPIRIT_ATTR)) {
+    if (normalize(k) === nq) return v;
+  }
+  for (const [k, v] of Object.entries(_USER_SPIRIT_ATTR)) {
+    if (fuzzyMatch(k, spiritName)) return v;
+  }
+  return null;
+}
+
+/**
+ * 同位置字符匹配得分（0 ~ min(a.len, b.len)），得分越高越相似。
+ * 例："烟花公爵" vs "烟花伯爵" → 3（烟、花、爵各自命中）
+ *     "烟花公爵" vs "小丑公爵" → 2（公、爵命中）
+ * 相比「只看是否 fuzzyMatch」，此得分能区分真正更相近的候选。
+ */
+function _posMatchScore(query, candidate) {
+  const nq = normalize(query);
+  const nc = normalize(candidate);
+  const len = Math.min(nq.length, nc.length);
+  let score = 0;
+  for (let i = 0; i < len; i++) {
+    if (nq[i] === nc[i]) score++;
+  }
+  // 长度相同时微加权（同等得分时优先等长候选，更保守）
+  if (nq.length === nc.length) score += 0.1;
+  return score;
+}
 
 /**
  * fuzzyResolveSpiritName(rawName)
  * 对存量精灵名做 display-time 模糊纠偏：
  *   1. 精确命中 → 直接返回，corrected=false
  *   2. fuzzyMatch 唯一候选 → 返回纠偏名，corrected=true
- *   3. 多个候选 → 取长度最接近的，corrected=true
+ *   3. 多个候选 → 用同位置字符匹配得分排序，取最高分（真正最相似）
+ *      例："烟花公爵" → [烟花伯爵(3分), 小丑公爵(2分)] → 返回"烟花伯爵"
  *   4. 无候选 → 原名，corrected=false（不乱猜）
  * 返回：{ resolved: string, corrected: boolean }
  */
@@ -989,7 +1207,13 @@ export function fuzzyResolveSpiritName(rawName) {
   const candidates = _FUZZY_SPIRIT_POOL.filter(n => fuzzyMatch(n, trimmed));
   if (candidates.length === 0) return { resolved: trimmed, corrected: false };
   if (candidates.length === 1) return { resolved: candidates[0], corrected: true };
-  // 多个候选：取长度最接近的（最保守的猜测）
-  candidates.sort((a, b) => Math.abs(a.length - trimmed.length) - Math.abs(b.length - trimmed.length));
+  // 多个候选：按同位置字符匹配得分降序排，取最高分（真正最相似的候选）
+  // 得分相同时再按长度差升序（等距时保守取等长）
+  candidates.sort((a, b) => {
+    const scoreA = _posMatchScore(trimmed, a);
+    const scoreB = _posMatchScore(trimmed, b);
+    if (scoreB !== scoreA) return scoreB - scoreA;
+    return Math.abs(a.length - trimmed.length) - Math.abs(b.length - trimmed.length);
+  });
   return { resolved: candidates[0], corrected: true };
 }

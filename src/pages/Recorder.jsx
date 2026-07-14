@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useStore } from '../store';
-import { PLANS, S2_PLANS, classifyResultType, getPlanAttrId, computeFamilyPool, resolvePlanIconImg, ATTR_LABEL, ALL_SHINIES, analyzePlanFruits, SPIRIT_ATTR1, getPlanFruitsArray } from '../data/plans';
+import { PLANS, classifyResultType, getPlanAttrId, computeFamilyPool, resolvePlanIconImg, ATTR_LABEL, ALL_SHINIES, analyzePlanFruits, SPIRIT_ATTR1, getPlanFruitsArray, fuzzyResolveSpiritName } from '../data/plans';
 import SpiritAvatar from '../components/SpiritAvatar';
 import PlanIcon from '../components/PlanIcon';
 import { FruitLine } from '../components/FruitTag';
@@ -9,11 +10,151 @@ import ResultModal from '../components/ResultModal';
 import ShinySelectModal from '../components/ShinySelectModal';
 import BreakSpiritModal from '../components/BreakSpiritModal';
 
+const getModalRoot = () => document.getElementById('modal-root') || document.body;
+
+// ─── 修改奇遇记录精灵名弹窗 ──────────────────────────────────────────────────
+function EditBreakSpiritModal({ spiritName, task, planId, onClose }) {
+  const { dispatch } = useStore();
+  const [newName, setNewName] = useState(spiritName);
+  const inputRef = useRef(null);
+
+  // 同名记录数（本任务内）
+  const sameNameCount = (task.shieldBreaks || []).filter(
+    b => b.spiritName === spiritName
+  ).length;
+
+  useEffect(() => {
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 100);
+  }, []);
+
+  const handleConfirm = () => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === spiritName) {
+      onClose();
+      return;
+    }
+    dispatch({
+      type: 'UPDATE_BREAK_SPIRIT_NAME',
+      planId,
+      oldName: spiritName,
+      newName: trimmed,
+    });
+    onClose();
+  };
+
+  // display-time 纠偏后的名字（用于头像展示）
+  const displayName = fuzzyResolveSpiritName(spiritName).resolved;
+
+  return createPortal(
+    <div
+      className="modal-overlay modal-overlay--no-tab"
+      onClick={onClose}
+    >
+      <div
+        className="modal-content"
+        onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '70vh', overflowY: 'auto' }}
+      >
+        <div className="modal-handle" />
+
+        {/* 标题 */}
+        <div style={{
+          fontSize: 16, fontWeight: 900, color: '#2B2A2E',
+          fontFamily: 'var(--font-display)',
+          textAlign: 'center', marginBottom: 16,
+        }}>修改奇遇精灵名</div>
+
+        {/* 当前精灵名展示 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 14,
+          padding: '8px 12px',
+          background: '#F0E8D5', borderRadius: 10,
+        }}>
+          <SpiritAvatar name={displayName} obtained size={36} showName={false} />
+          <div>
+            <div style={{ fontSize: 10, color: '#A09080', fontWeight: 600 }}>当前记录为</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>{spiritName}</div>
+          </div>
+        </div>
+
+        {/* 新精灵名输入 */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#675D53', marginBottom: 6 }}>修改为</div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); }}
+            placeholder="输入正确的精灵名"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '10px 14px', borderRadius: 10,
+              border: '2px solid rgba(200,131,10,0.4)',
+              background: '#FFFBF0',
+              fontSize: 15, fontWeight: 800, fontFamily: 'var(--font-display)',
+              color: '#2B2A2E', outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* 批量提示（始终批量，无需勾选） */}
+        {sameNameCount > 1 && (
+          <div style={{
+            padding: '10px 12px', marginBottom: 14,
+            background: 'rgba(91,156,246,0.06)',
+            border: '1px solid rgba(91,156,246,0.25)',
+            borderRadius: 10,
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#2B2A2E' }}>
+              本任务中共有 {sameNameCount} 条「{spiritName}」记录
+            </div>
+            <div style={{ fontSize: 10, color: '#5B9CF6', fontWeight: 600, marginTop: 2 }}>
+              将全部修改为新名称，三池归属自动重新计算
+            </div>
+          </div>
+        )}
+
+        {/* 操作按钮 */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '11px 0',
+              border: '1.5px solid rgba(103,93,83,0.3)', borderRadius: 10,
+              background: 'var(--card-inner)', color: 'var(--text-muted)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >取消</button>
+          <button
+            onClick={handleConfirm}
+            disabled={!newName.trim() || newName.trim() === spiritName}
+            style={{
+              flex: 1, padding: '11px 0',
+              border: '2px solid #2B2A2E', borderRadius: 10,
+              background: '#2B2A2E', color: '#FBF7EC',
+              fontSize: 13, fontWeight: 800, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              boxShadow: '0 2px 0 #111014',
+              opacity: (!newName.trim() || newName.trim() === spiritName) ? 0.4 : 1,
+            }}
+          >确认修改{sameNameCount > 1 ? `（${sameNameCount}条）` : ''}</button>
+        </div>
+      </div>
+    </div>,
+    getModalRoot()
+  );
+}
+
 export default function Recorder({ planId, navigate }) {
   const { state, dispatch, poolCounts } = useStore();
   const task = (state.activeTasks || []).find(t => t.planId === planId);
   const rawPlan = PLANS.find(p => p.id === planId)
-    || S2_PLANS.find(p => p.id === planId)
     || (state.userPlanConfig || []).find(p => p.id === planId);
   // 标准化：自定义方案继承基础属性方案的图标
   const attrBase = rawPlan?.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
@@ -53,6 +194,8 @@ export default function Recorder({ planId, navigate }) {
   const [editStartAtt, setEditStartAtt] = useState('');
   // 「配置咕噜球」Sheet（task 尚未设置球数时使用）
   const [showBallSetup, setShowBallSetup] = useState(false);
+  // 修改奇遇记录精灵名弹窗
+  const [editBreakSpirit, setEditBreakSpirit] = useState(null); // null | spiritName string
   const [setupMode, setSetupMode] = useState('simple');
   const [setupInput, setSetupInput] = useState('');
   const [setupAdv, setSetupAdv] = useState('');
@@ -60,6 +203,14 @@ export default function Recorder({ planId, navigate }) {
   const [setupAtt, setSetupAtt] = useState('');
 
   if (!plan || !task) return null;
+
+  // 判断本 active task 是否有关联的「继续刷」出货记录（通过 COMPLETE_AND_CONTINUE 写入的快照）
+  // 这些记录的 planId 与当前任务相同，且带有 hasContinuation: true 标记
+  // 用于在删除确认弹窗中提示用户：「已出货的异色记录不会一并删除」
+  const linkedShinyRecords = (state.completedTasks || []).filter(
+    t => t.planId === planId && t.hasContinuation && t.resultType !== 'abandoned'
+  );
+  const hasLinkedShiny = linkedShinyRecords.length > 0;
 
   const handleResult = (result) => {
     setShowResult(false);
@@ -772,7 +923,7 @@ export default function Recorder({ planId, navigate }) {
             <span style={{ color: 'var(--text-muted)' }}>果冻&虫×{task.shieldBreaks.filter(b => b.result === 'jelly').length}</span>
           </div>
         </div>
-        <ShieldDots breaks={task.shieldBreaks} max={100} />
+        <ShieldDots breaks={task.shieldBreaks} max={100} onSpiritClick={setEditBreakSpirit} />
       </div>
 
       {/* ── 双列卡：保底进度 + 咕噜球 ── */}
@@ -800,11 +951,6 @@ export default function Recorder({ planId, navigate }) {
           {/* 细节行 */}
           <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.7 }}>
             <div>每次 1.8% 概率出异色</div>
-            {task.shieldBreaks.some(b => b.result === 'jelly') && (
-              <div style={{ color: 'var(--text-muted)' }}>
-                含果冻&虫 {task.shieldBreaks.filter(b => b.result === 'jelly').length} 次（不占保底）
-              </div>
-            )}
           </div>
         </div>
 
@@ -1368,6 +1514,14 @@ export default function Recorder({ planId, navigate }) {
       {showShinySelect && (
         <ShinySelectModal plan={plan} onSelect={handleShinySelect} onClose={() => setShowShinySelect(false)} hasTabBar={false} />
       )}
+      {editBreakSpirit && (
+        <EditBreakSpiritModal
+          spiritName={editBreakSpirit}
+          task={task}
+          planId={planId}
+          onClose={() => setEditBreakSpirit(null)}
+        />
+      )}
 
       {/* 删除确认弹窗 */}
       {showAbandonConfirm && (
@@ -1400,7 +1554,7 @@ export default function Recorder({ planId, navigate }) {
             {/* 提示文案 */}
             <div style={{
               fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7,
-              textAlign: 'center', marginBottom: 20,
+              textAlign: 'center', marginBottom: hasLinkedShiny ? 10 : 20,
               padding: '10px 8px',
               background: 'rgba(200,53,26,0.06)',
               borderRadius: 8,
@@ -1409,6 +1563,20 @@ export default function Recorder({ planId, navigate }) {
               删除后该记录<strong style={{ color: 'var(--danger)' }}>无法找回</strong>，<br />
               包括已记录的触发污染次数和球数数据。
             </div>
+            {/* 有「继续刷」出货记录时，额外提示用户不会连带删除 */}
+            {hasLinkedShiny && (
+              <div style={{
+                fontSize: 11, color: '#2B7A4B', lineHeight: 1.7,
+                textAlign: 'center', marginBottom: 20,
+                padding: '8px 10px',
+                background: 'rgba(75,156,70,0.07)',
+                borderRadius: 8,
+                border: '1px solid rgba(75,156,70,0.25)',
+              }}>
+                ✅ 本方案已出货的 <strong style={{ color: '#2B7A4B' }}>{linkedShinyRecords.length} 条异色记录</strong>不会被删除，<br />
+                可在「刷取记录」页单独管理。
+              </div>
+            )}
             {/* 按钮组 */}
             <div style={{ display: 'flex', gap: 10 }}>
               <button

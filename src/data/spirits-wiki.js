@@ -11,6 +11,7 @@ export const SPIRITS_WIKI_IMG = {
   "白发懒人": "https://patchwiki.biligame.com/images/rocom/4/46/06pz2jvhh5k0ukbgj30jmdfyz4nic06.png",
   "白发路路": "https://patchwiki.biligame.com/images/rocom/9/9a/hx21iweu65ojmeo4ws3ucpbsngknrv9.png",
   "白金独角兽": "https://patchwiki.biligame.com/images/rocom/b/b0/6mn7g1bmit3kop684uwf2ns9tg4rsed.png",
+  "半朽蜜果灵": "/spirits/%E5%8D%8A%E6%9C%BD%E8%9C%9C%E6%9E%9C%E7%81%B5.webp",
   "斑斑": "https://patchwiki.biligame.com/images/rocom/a/a7/9yzfpa9tuduznirix7p82i40nqlkfep.png",
   "斑枭": "https://patchwiki.biligame.com/images/rocom/a/a7/hnf5vk2e32l7c5s4rozuy2iuopkykoq.png",
   "板板壳": "https://patchwiki.biligame.com/images/rocom/0/05/7yi5qyeejez9yyyhya70f2fkvtwlrp2.png",
@@ -83,6 +84,7 @@ export const SPIRITS_WIKI_IMG = {
   "大耳帽兜": "https://patchwiki.biligame.com/images/rocom/9/90/5nj4in6eecm1rhiqat7avfogm5l3cx0.png",
   "大耳帽兜 异色": "https://patchwiki.biligame.com/images/rocom/c/c9/kpgbuasmb64v2gmnvar4fv4hs1nzkn0.png",
   "大头骨龙": "https://patchwiki.biligame.com/images/rocom/d/dc/oaohfrfv4b6cx8elngiwarhn9phgzch.png",
+  "稻草守护者": "/spirits/%E7%A8%BB%E8%8D%89%E5%AE%88%E6%8A%A4%E8%80%85.webp",
   "呆小路": "https://patchwiki.biligame.com/images/rocom/b/be/4zu0yqt23bt4cva2bswky1q5ivje1tw.png",
   "胆小鳗鱼": "https://patchwiki.biligame.com/images/rocom/6/65/sexctmvdy5pnj2fgqdue7sovqn9cw4z.png",
   "地鼠": "https://patchwiki.biligame.com/images/rocom/e/ed/p13cco2es9ta74gd9w8yqdoc0va3qp6.png",
@@ -183,6 +185,8 @@ export const SPIRITS_WIKI_IMG = {
   "红丝绒 异色": "https://patchwiki.biligame.com/images/rocom/a/a4/jpg35o50rwnvvz4kbkn9arhcr6t33tr.png",
   "呼呼猪": "https://patchwiki.biligame.com/images/rocom/e/e8/8vuqx5j838k85ddgjcl56zhh42wtfqa.png",
   "呼呼猪 异色": "https://patchwiki.biligame.com/images/rocom/f/f1/9u3fequest0u8fn680z2oz0ycca8miv.png",
+  "胡桃王子": "/spirits/%E8%83%A1%E6%A1%83%E7%8E%8B%E5%AD%90.webp",
+  "蝴蝶陶陶": "https://patchwiki.biligame.com/images/rocom/0/00/placeholder_hudietaotao.png",     // S3 奇遇·萌系，bwiki 暂无页面
   "忽幽狸": "https://patchwiki.biligame.com/images/rocom/7/78/2jxh0kfsg1lzfa640r2nyaz03bcr97j.png",
   "护主犬": "https://patchwiki.biligame.com/images/rocom/6/64/t29c2r5ooabyzne8dt5uu9bzq10ibtz.png",
   "护主犬 异色": "https://patchwiki.biligame.com/images/rocom/a/ad/q0p89lpu2xfd5z032ihyslzinweq6tw.png",
@@ -245,6 +249,7 @@ export const SPIRITS_WIKI_IMG = {
   "咔咔鸟": "https://patchwiki.biligame.com/images/rocom/f/fa/9xi3n8libbst7y2xe4bja79hfbmcmmn.png",
   "咔咔雀": "https://patchwiki.biligame.com/images/rocom/9/9a/ap3uj4ncl7ems9nor7p2eekc040rowl.png",
   "咔咔羽毛": "https://patchwiki.biligame.com/images/rocom/e/ed/ob21aol2viw67k7tp5830dj3rzphp66.png",
+  "卡拉波斯": "/spirits/%E5%8D%A1%E6%8B%89%E6%B3%A2%E6%96%AF.webp",
   "卡卡虫": "https://patchwiki.biligame.com/images/rocom/d/d7/bi5t0j12hzaiw6f43kjijgblr8les6s.png",
   "卡卡虫（草地附近的样子）": "https://patchwiki.biligame.com/images/rocom/d/d7/bi5t0j12hzaiw6f43kjijgblr8les6s.png",
   "卡卡虫（火山附近的样子）": "https://patchwiki.biligame.com/images/rocom/5/5e/rh4e9152el8uyukcseloj0f6fgvbmew.png",
@@ -259,6 +264,7 @@ export const SPIRITS_WIKI_IMG = {
   "铠甲虫": "https://patchwiki.biligame.com/images/rocom/6/6e/c2qomiq244hfmlrgiwvd13n0pmn1znj.png",
   "瞌睡王": "https://patchwiki.biligame.com/images/rocom/a/a2/64947rnxu8ncihl37rqldr3653bg57n.png",
   "睡睡王": "https://patchwiki.biligame.com/images/rocom/a/a2/64947rnxu8ncihl37rqldr3653bg57n.png", // 同家族：瞌睡王（bwiki 暂无专属页面）
+  "壳栗丝鼠": "https://patchwiki.biligame.com/images/rocom/0/00/placeholder_kelisishu.png",       // S3 奇遇·毒系，bwiki 暂无页面，待补图
   "壳乙螺": "https://patchwiki.biligame.com/images/rocom/9/9e/tefnpfeeyu3n93u9gp0d9sfk11s5tol.png",
   "可爱猿": "https://patchwiki.biligame.com/images/rocom/e/e0/1xsbef59im08o1aui67cvgqp9nr1a58.png",
   "可立鸡": "https://patchwiki.biligame.com/images/rocom/2/2d/9w4l9rr13yoldnqxtppebm3tqovahde.png",
@@ -270,6 +276,7 @@ export const SPIRITS_WIKI_IMG = {
   "酷拉 异色": "https://patchwiki.biligame.com/images/rocom/b/b0/0a4re28no5axjfaazy5qpysri7a42jp.png",
   "快鳍鱼": "https://patchwiki.biligame.com/images/rocom/6/63/408ag6ovu931hssd7kstv1bemj4ltgc.png",
   "矿晶虫": "https://patchwiki.biligame.com/images/rocom/4/4b/rakgahc3c1vonzb7l1oypg0kwmhpi3z.png",
+  "离心舞者": "/spirits/%E7%A6%BB%E5%BF%83%E8%88%9E%E8%80%85.webp",
   "拉特": "https://patchwiki.biligame.com/images/rocom/a/a1/4pqv1u751dss8ff0u87y747ot29b4m9.png",
   "拉特 异色": "https://patchwiki.biligame.com/images/rocom/2/21/hrrf9oeuxkkd92xul8hegie4ahk0enj.png",
   "岚鸟": "https://patchwiki.biligame.com/images/rocom/7/7f/ac3t55pytqhv4x8c9z9w7w6k00glr8p.png",
@@ -295,6 +302,7 @@ export const SPIRITS_WIKI_IMG = {
   "灵羽勇士": "https://patchwiki.biligame.com/images/rocom/4/44/tmhilmz97pggub3yrsredfnuv5e2jd2.png",
   "铃兰羊": "https://patchwiki.biligame.com/images/rocom/a/af/pbgcws3qiaqvryk28q9cmer116jy71d.png",
   "流浪鼠": "https://patchwiki.biligame.com/images/rocom/e/e7/1ewnn289ny2ksdz247u2i3ytq7xnv03.png",
+  "流明坎德拉": "/spirits/%E6%B5%81%E6%98%8E%E5%9D%8E%E5%BE%B7%E6%8B%89.webp",
   "琉璃水母": "https://patchwiki.biligame.com/images/rocom/d/de/k7nubtsz7deg1n4u2a960xgw7z7awlo.png",
   "龙息帕尔": "https://patchwiki.biligame.com/images/rocom/0/0f/q0bwy4syzqav082nqhy9tl7i8hsirz4.png",
   "龙鱼": "https://patchwiki.biligame.com/images/rocom/1/1b/9pwwn6fecfi32vefzwgmfcpftbkfvxi.png",
@@ -339,6 +347,7 @@ export const SPIRITS_WIKI_IMG = {
   "爬爬": "https://patchwiki.biligame.com/images/rocom/e/ea/524nzn85da28i54swvfzqbucowmlvu0.png",
   "帕尔萨斯": "https://patchwiki.biligame.com/images/rocom/c/cb/gteuesfklnj4acn55f3aqr0wrtlwki4.png",
   "帕帕斯卡": "https://patchwiki.biligame.com/images/rocom/4/48/0go6kjyt43jmyphx2po4l7j8g5jdh98.png",
+  "炮米花": "https://patchwiki.biligame.com/images/rocom/0/00/placeholder_paomihua.png",          // S3 奇遇·草系，bwiki 暂无页面，待补图
   "蓬叶虫": "https://patchwiki.biligame.com/images/rocom/b/ba/p11mh7sopmm5wvvo4b0maw1j31n6vav.png",
   "蓬叶虫（金黄的样子）": "https://patchwiki.biligame.com/images/rocom/b/ba/p11mh7sopmm5wvvo4b0maw1j31n6vav.png",
   "蓬叶虫（枯叶的样子）": "https://patchwiki.biligame.com/images/rocom/6/69/3u9u30vxoygg6q3okswrz5nwim5qfa8.png",
@@ -394,6 +403,7 @@ export const SPIRITS_WIKI_IMG = {
   "闪电鳗鱼": "https://patchwiki.biligame.com/images/rocom/c/cf/tfvre4g1cbdv74tv7wydn5udn5gtdiv.png",
   "上岸蛙": "https://patchwiki.biligame.com/images/rocom/c/ca/n3bvy3z45vn9j7w9cmmvceao752e7e3.png",
   "绅士鸡": "https://patchwiki.biligame.com/images/rocom/f/fc/tlu25qyk7b26q2d2fpv5mkuwafz4tv3.png",
+  "深渊蛙": "https://patchwiki.biligame.com/images/rocom/0/00/placeholder_shenyuanwa.png",        // S3 奇遇·水系，bwiki 暂无页面，待补图
   "深蓝鲸": "https://patchwiki.biligame.com/images/rocom/4/4c/eonvrfjw5xrztsmkzmwz4eutdi7oban.png",
   "神圣狮鹫": "https://patchwiki.biligame.com/images/rocom/d/d9/3mwu2jzht3bpapm9p9u6imj8tspjz6z.png",
   "神圣狮鹫（高山地的样子）": "https://patchwiki.biligame.com/images/rocom/6/62/c7bikx38s3y63ffwlwabxqc77qyjtwy.png",

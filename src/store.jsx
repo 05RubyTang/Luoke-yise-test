@@ -1,6 +1,6 @@
-import { createContext, useContext, useReducer, useEffect, useMemo, useRef, useState } from 'react';
-import { ALL_SHINIES, classifyPool, computePoolCounts, PLANS, resolveShinyKey, FRUIT_ATTR, getAttrByAnyName, getPlanFruitsArray, inferSpiritSeason, inferPlanSeason } from './data/plans';
-import { S2_PLANS } from './data/seasons/s2Plans';
+import { createContext, useContext, useReducer, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ALL_SHINIES, classifyPool, computePoolCounts, PLANS, resolveShinyKey, FRUIT_ATTR, getAttrByAnyName, getPlanFruitsArray, inferSpiritSeason, inferPlanSeason, registerUserSpirits } from './data/plans';
+import { S3_PLANS } from './data/plans';
 import { DEFAULT_SEASON } from './data/seasons';
 import { supabase } from './supabase';
 
@@ -18,6 +18,23 @@ const DEVICE_ID = (() => {
   }
   return id;
 })();
+
+// ─── 云端日志工具（fire-and-forget，不影响任何业务逻辑）─────────────────────
+// 用途：记录关键用户行为，便于按邮箱排查线上问题
+// 表结构（Supabase）：user_logs(id uuid, user_id text, user_email text,
+//   device_id text, event_type text, payload jsonb, created_at timestamptz)
+function cloudLog(userId, userEmail, eventType, payload = {}) {
+  if (!userId) return; // 尚未获得 uid（极早期启动），跳过
+  supabase.from('user_logs').insert({
+    user_id: userId,
+    user_email: userEmail || null,
+    device_id: DEVICE_ID,
+    event_type: eventType,
+    payload,
+  }).then(({ error }) => {
+    if (error) console.warn('[CloudLog] 写入日志失败:', error.message);
+  });
+}
 
 // ─── 确保 localStorage 里始终有用户名（App 启动时立即执行）───────────────────
 function ensureUsername() {
@@ -52,7 +69,7 @@ function buildDefaultState() {
     attrPools: {},
     worldPool: 0,
     // ── 赛季相关 ─────────────────────────────────────────────────────────
-    currentSeason: DEFAULT_SEASON,  // 当前选中的赛季（'S1' | 'S2'）
+    currentSeason: DEFAULT_SEASON,  // 当前选中的赛季（'S1' | 'S2' | 'S3'）
     battlePassSpirits: {},          // 战令异色标记 { '雪怪': { obtained: true, obtainedAt: '...' } }
     // ── 数据迁移标记 ──────────────────────────────────────────────────────
     _migratedToSeasons: false,      // 旧数据迁移完成标记（幂等保障）
@@ -182,7 +199,7 @@ function migrateBreakPools(state) {
   if (state._migratedBreakPoolsV2) return state;
 
   // 合并内置方案 + 用户自定义方案
-  const allPlans = [...(PLANS || []), ...(S2_PLANS || []), ...(state.userPlanConfig || [])];
+  const allPlans = [...(PLANS || []), ...(S3_PLANS || []), ...(state.userPlanConfig || [])];
 
   const fixBreaks = (task) => {
     const plan = allPlans.find(p => p.id === task.planId);
@@ -211,6 +228,37 @@ function migrateBreakPools(state) {
 }
 
 // ─── 从 localStorage 读取（离线 / 首屏用）──────────────────────────────────────
+/**
+ * 从 userPlanConfig 中提取所有精灵名+属性，用于注入 registerUserSpirits。
+ * 覆盖三种来源：新 fruits[] 格式 / 旧 spiritA+spiritB 字段 / shinies[] 目标精灵。
+ * 纯函数，可在 getLocalState（同步）和 useEffect（响应式）中复用。
+ */
+function extractUserSpiritEntries(userPlanConfig) {
+  const entries = [];
+  if (!Array.isArray(userPlanConfig)) return entries;
+  userPlanConfig
+    .filter(p => !p.deleted)
+    .forEach(plan => {
+      // 新 fruits[] 格式：每槽携带 spirit + attr
+      const fromFruits = Array.isArray(plan.fruits)
+        ? plan.fruits.map(f => ({ name: f.spirit?.trim(), attrId: f.attr || plan.attrId || null }))
+        : [];
+      // 旧 spiritA / spiritB 字段（兼容）
+      const fromLegacy = [
+        plan.spiritA ? { name: plan.spiritA.trim(), attrId: plan.attrA || plan.attrId || null } : null,
+        plan.spiritB ? { name: plan.spiritB.trim(), attrId: plan.attrB || plan.attrId || null } : null,
+      ].filter(Boolean);
+      // 优先用 fruits[]；若为空则用 legacy 两字段
+      const slots = fromFruits.length > 0 ? fromFruits : fromLegacy;
+      slots.forEach(e => { if (e.name) entries.push(e); });
+      // shinies[]：用户自选目标异色精灵也纳入候选池
+      (plan.shinies || []).forEach(name => {
+        if (name) entries.push({ name, attrId: plan.attrId || null });
+      });
+    });
+  return entries;
+}
+
 function getLocalState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -241,7 +289,16 @@ function getLocalState() {
       // 数据迁移：为旧版 S1 数据补全 season 字段（幂等）；再按出货精灵修正历史记录赛季；
       // 再修正存量自定义方案 shieldBreak 的 pool 字段（早期 analyzePlanFruits 推断错误导致）；
       // 再对照 userPlanConfig 修正 activeTasks 的 task.season（早期 START_TASK 兜底 S1 导致误标）
-      return migrateActiveTaskSeasons(migrateBreakPools(migrateResultSeasons(migrateLegacyData(merged))));
+      const finalState = migrateActiveTaskSeasons(migrateBreakPools(migrateResultSeasons(migrateLegacyData(merged))));
+
+      // ── 同步注入用户自定义精灵到纠偏候选池 ───────────────────────────────────
+      // 必须在 getLocalState 内同步执行（而非仅靠 useEffect），原因：
+      // useEffect 在首次渲染完成后才触发，若 Profile/ShieldDots 在首次渲染时调用
+      // fuzzyResolveSpiritName，此时注册尚未完成，存量自定义精灵仍会被误纠偏。
+      const entries = extractUserSpiritEntries(finalState.userPlanConfig);
+      if (entries.length > 0) registerUserSpirits(entries);
+
+      return finalState;
     }
   } catch {}
   return buildDefaultState();
@@ -304,9 +361,9 @@ function reducer(state, action) {
       const POOL_CLASSIFIABLE = ['polluted', 'original', 'shiny_blood', 'mixed_blood'];
       let breakPool = null;
       if (POOL_CLASSIFIABLE.includes(action.result) && action.spiritName) {
-        // 同时查内置方案（S1+S2）和用户自定义方案（自定义方案 id 形如 user_plan_xxx）
+        // 同时查内置方案（S1+S2+S3）和用户自定义方案（自定义方案 id 形如 user_plan_xxx）
         const plan = PLANS.find(p => p.id === action.planId)
-          || S2_PLANS.find(p => p.id === action.planId)
+          || S3_PLANS.find(p => p.id === action.planId)
           || (state.userPlanConfig || []).find(p => p.id === action.planId);
         breakPool = classifyPool(action.spiritName, plan);
       } else if (action.result === 'jelly') {
@@ -545,11 +602,25 @@ function reducer(state, action) {
           obtainedAt: new Date().toISOString(),
         };
       }
+      // 将 planId 写入墓碑列表（含时间戳），防止 mergeStates 从云端把已完成任务复活到 activeTasks
+      // 新格式：{ planId, tombstonedAt }，供 RECONCILE_ACTIVE_TASKS 与 task.startTime 比较，
+      // 允许用户完成后再对同一方案开始新任务，不会被误删。
+      const prevAbandonedForComplete = Array.isArray(state.abandonedPlanIds) ? state.abandonedPlanIds : [];
+      const abandonedPlanIdsForComplete = action.planId
+        ? [
+            // 先移除同 planId 的旧墓碑（兼容字符串旧格式和对象新格式），再追加最新墓碑
+            ...prevAbandonedForComplete.filter(e =>
+              typeof e === 'string' ? e !== action.planId : e.planId !== action.planId
+            ),
+            { planId: action.planId, tombstonedAt: new Date().toISOString() },
+          ]
+        : prevAbandonedForComplete;
       return {
         ...state,
         spirits: newSpirits,
         activeTasks: state.activeTasks.filter(t => t.planId !== action.planId),
         completedTasks: [completed, ...state.completedTasks],
+        abandonedPlanIds: abandonedPlanIdsForComplete,
       };
     }
     case 'COMPLETE_AND_CONTINUE': {
@@ -604,7 +675,7 @@ function reducer(state, action) {
 
       // 实时推断 break 所属池（有 spiritName 就重新算，忽略存量 pool 字段，修复存量数据误判）
       const cacPlan = PLANS.find(p => p.id === action.planId)
-        || S2_PLANS.find(p => p.id === action.planId)
+        || S3_PLANS.find(p => p.id === action.planId)
         || (state.userPlanConfig || []).find(p => p.id === action.planId);
       const deriveBreakPool = (b) => {
         if (b.result === 'jelly') return 'world'; // 果冻/星辰虫固定归世界池，不走 classifyPool 重推
@@ -698,10 +769,17 @@ function reducer(state, action) {
       const task = state.activeTasks.find(t => t.planId === action.planId);
       if (!task) return state;
       // 无论破盾次数多少，一律静默删除，不写入 completedTasks
-      // 同时将 planId 写入墓碑列表，防止刷新后 mergeStates 从云端把任务复活
+      // 同时将 planId 写入墓碑列表（含时间戳），防止刷新后 mergeStates 从云端把任务复活
+      // 新格式：{ planId, tombstonedAt }，允许用户放弃后对同方案重新开始新任务，不会被误删
       const prevAbandoned = Array.isArray(state.abandonedPlanIds) ? state.abandonedPlanIds : [];
       const abandonedPlanIds = action.planId
-        ? [...new Set([...prevAbandoned, action.planId])]
+        ? [
+            // 先移除同 planId 的旧墓碑（兼容字符串旧格式和对象新格式），再追加最新墓碑
+            ...prevAbandoned.filter(e =>
+              typeof e === 'string' ? e !== action.planId : e.planId !== action.planId
+            ),
+            { planId: action.planId, tombstonedAt: new Date().toISOString() },
+          ]
         : prevAbandoned;
       return {
         ...state,
@@ -737,6 +815,113 @@ function reducer(state, action) {
               original: action.original ?? (t.breakdowns?.original || 0),
             },
           };
+        }),
+      };
+    }
+    // ── 批量修改已完成任务的出货精灵名 ──────────────────────────────────────────
+    // action: { taskIds: string[], newSpiritName: string }
+    // 联动更新：resultSpirit、season（重新推断）、spirits 图鉴（旧名熄灭 / 新名点亮）
+    // 按方案批量：UI 层负责收集同 planId + 同旧名的 taskIds，reducer 只按 taskIds 执行
+    case 'UPDATE_COMPLETED_SPIRIT': {
+      const { taskIds, newSpiritName } = action;
+      if (!taskIds?.length || !newSpiritName?.trim()) return state;
+      const trimmedName = newSpiritName.trim();
+      const taskIdSet = new Set(taskIds);
+
+      // 异色出货白名单（与 RECONCILE_SHINIES / DELETE_COMPLETED_TASK 保持一致）
+      const SHINY_RESULT_TYPES_UCS = new Set([
+        'family', 'attr', 'world', 'pool', 'offpool', 'manual',
+      ]);
+
+      // 1. 收集旧精灵名的 shinyKey（改之前）
+      const oldSpiritKeys = new Set();
+      state.completedTasks.forEach(t => {
+        if (!taskIdSet.has(t.id)) return;
+        if (!t.resultSpirit) return;
+        if (t.resultType && !SHINY_RESULT_TYPES_UCS.has(t.resultType)) return;
+        const key = resolveShinyKey(t.resultSpirit);
+        if (key) oldSpiritKeys.add(key);
+      });
+
+      // 2. 批量更新 completedTasks
+      const newCompletedTasks = state.completedTasks.map(t => {
+        if (!taskIdSet.has(t.id)) return t;
+        return {
+          ...t,
+          resultSpirit: trimmedName,
+          // 按新精灵名重新推断赛季；推断失败则保持原值
+          season: inferSpiritSeason(trimmedName) || t.season,
+        };
+      });
+
+      // 3. 图鉴联动
+      const newSpirits = { ...state.spirits };
+
+      // 3a. 旧精灵名：检查是否还有其他记录引用，没有则熄灭
+      oldSpiritKeys.forEach(oldKey => {
+        if (!newSpirits[oldKey]?.obtained) return;
+        const stillReferenced = newCompletedTasks.some(t =>
+          t.resultSpirit
+          && t.resultType !== 'abandoned'
+          && (!t.resultType || SHINY_RESULT_TYPES_UCS.has(t.resultType))
+          && resolveShinyKey(t.resultSpirit) === oldKey
+        );
+        if (!stillReferenced) {
+          newSpirits[oldKey] = {
+            ...newSpirits[oldKey],
+            obtained: false,
+            obtainedAt: null,
+            obtainedFrom: null,
+          };
+        }
+      });
+
+      // 3b. 新精灵名：尝试点亮（自定义精灵不在图鉴里则跳过）
+      const newKey = resolveShinyKey(trimmedName);
+      if (newKey && newSpirits[newKey] && !newSpirits[newKey].obtained) {
+        newSpirits[newKey] = {
+          ...newSpirits[newKey],
+          obtained: true,
+          obtainedFrom: 'edit',
+          obtainedAt: new Date().toISOString(),
+        };
+      }
+
+      return { ...state, completedTasks: newCompletedTasks, spirits: newSpirits };
+    }
+    // ── 批量修改进行中任务的奇遇记录精灵名 ────────────────────────────────────────
+    // action: { planId: string, oldName: string, newName: string }
+    // 将指定 activeTask 的 shieldBreaks[] 中所有 spiritName === oldName 的记录批量改为 newName，
+    // 同时重新派生每条被修改记录的 pool 字段（pool 归属依赖 spiritName + plan）。
+    // 不涉及图鉴联动（奇遇记录不是异色出货）。
+    case 'UPDATE_BREAK_SPIRIT_NAME': {
+      const { planId, oldName, newName } = action;
+      if (!planId || !oldName || !newName?.trim()) return state;
+      const trimmedNew = newName.trim();
+      if (trimmedNew === oldName) return state;
+
+      // 查找方案（用于重新派生 pool）
+      const ubsnPlan = PLANS.find(p => p.id === planId)
+        || S3_PLANS.find(p => p.id === planId)
+        || (state.userPlanConfig || []).find(p => p.id === planId);
+
+      return {
+        ...state,
+        activeTasks: updateTask(state.activeTasks, planId, task => {
+          let changed = false;
+          const newBreaks = task.shieldBreaks.map(b => {
+            if (b.spiritName !== oldName) return b;
+            changed = true;
+            // 重新派生 pool
+            const newPool = classifyPool(trimmedNew, ubsnPlan);
+            return {
+              ...b,
+              spiritName: trimmedNew,
+              ...(newPool ? { pool: newPool } : {}),
+            };
+          });
+          if (!changed) return task;
+          return { ...task, shieldBreaks: newBreaks };
         }),
       };
     }
@@ -1050,6 +1235,39 @@ function reducer(state, action) {
         customFruits: [...(state.customFruits || []), ...toAdd],
       };
     }
+    // 存量修复：把 planId 在 abandonedPlanIds 墓碑里但仍残留于 activeTasks 的"僵尸任务"清除。
+    // 触发场景：Bug 2（hydrateFromCloud 时序问题）曾导致已完成任务被重新写回 activeTasks，
+    // 即便其 planId 已写入墓碑，因 _HYDRATE_FROM_CLOUD 覆盖了整个 state 导致复活。
+    // 此 action 在启动时 / abandonedPlanIds 变化时调用，完全幂等：
+    //   - 无僵尸任务时返回同一 state 引用，不触发 re-render 或持久化
+    //   - 有僵尸任务时安全移除，下一轮调用时因无变化而稳定
+    //
+    // 墓碑新格式：{ planId, tombstonedAt }（旧格式字符串已被历史 RECONCILE 清理，此处跳过）
+    // 判定规则：task.startTime < tombstonedAt → 僵尸（任务比墓碑旧），移除
+    //           task.startTime >= tombstonedAt → 合法新任务（完成后重新开始同方案），保留
+    case 'RECONCILE_ACTIVE_TASKS': {
+      // 构建 planId → tombstonedAt 映射，同 planId 取最新墓碑时间
+      const tombstoneMap = new Map();
+      (Array.isArray(state.abandonedPlanIds) ? state.abandonedPlanIds : []).forEach(entry => {
+        if (entry && typeof entry === 'object' && entry.planId) {
+          const existing = tombstoneMap.get(entry.planId);
+          if (!existing || entry.tombstonedAt > existing) {
+            tombstoneMap.set(entry.planId, entry.tombstonedAt);
+          }
+        }
+        // 旧格式字符串：跳过。旧 RECONCILE 已在历史版本清理过僵尸任务，
+        // 此处跳过可避免把用户合法开启的新任务（同 planId）误删。
+      });
+      if (tombstoneMap.size === 0) return state;
+      const cleaned = (state.activeTasks || []).filter(t => {
+        const tombstonedAt = tombstoneMap.get(t.planId);
+        if (!tombstonedAt) return true;              // 不在墓碑里，保留
+        return t.startTime >= tombstonedAt;          // 任务比墓碑新（重新开始的合法任务），保留
+      });
+      if (cleaned.length === (state.activeTasks || []).length) return state;
+      console.log('[Store] RECONCILE_ACTIVE_TASKS: 清除僵尸任务', (state.activeTasks || []).length - cleaned.length, '条');
+      return { ...state, activeTasks: cleaned };
+    }
     case 'SWITCH_SEASON': {
       return {
         ...state,
@@ -1190,11 +1408,26 @@ function mergeStates(local, cloud) {
   // 本地有的 planId → 用本地（当前刷球现场，数据最新）
   // 本地没有但云端有 → 从云端恢复（换设备继续进行中任务）
   // 同 planId 两边都有 → 本地优先，同时合并 shieldBreaks 确保破盾记录不丢
-  // abandonedPlanIds：本地主动删除的任务墓碑，云端同 planId 的任务不再补入（防刷新复活）
-  const localAbandonedIds = new Set([
-    ...(Array.isArray(local.abandonedPlanIds) ? local.abandonedPlanIds : []),
-    ...(Array.isArray(cloud.abandonedPlanIds) ? cloud.abandonedPlanIds : []),
-  ]);
+  // abandonedPlanIds 合并：新格式 { planId, tombstonedAt }，按 planId 去重取最新墓碑时间
+  //   旧格式（字符串）兼容：视为 tombstonedAt = epoch，在云端任务过滤中防止旧僵尸复活
+  const tombstoneMap = new Map();
+  const processTombstoneEntry = (entry) => {
+    if (typeof entry === 'string') {
+      // 旧格式：planId 字符串，tombstonedAt 视为 epoch（最早时间）
+      // 对云端任务过滤：cloudTask.startTime >= epoch 永远为 true，
+      // 意味着旧字符串墓碑不再阻止云端同 planId 任务补入。
+      // 可接受：旧僵尸任务已被历史 RECONCILE 清理；新开的任务不应被旧墓碑阻止。
+      if (!tombstoneMap.has(entry)) tombstoneMap.set(entry, '1970-01-01T00:00:00.000Z');
+    } else if (entry && typeof entry === 'object' && entry.planId) {
+      const existing = tombstoneMap.get(entry.planId);
+      if (!existing || entry.tombstonedAt > existing) {
+        tombstoneMap.set(entry.planId, entry.tombstonedAt);
+      }
+    }
+  };
+  (Array.isArray(local.abandonedPlanIds) ? local.abandonedPlanIds : []).forEach(processTombstoneEntry);
+  (Array.isArray(cloud.abandonedPlanIds) ? cloud.abandonedPlanIds : []).forEach(processTombstoneEntry);
+
   const localActiveMap = new Map((local.activeTasks || []).map(t => [t.planId, t]));
   const activeTasks = (local.activeTasks || []).map(localTask => {
     const cloudTask = (cloud.activeTasks || []).find(c => c.planId === localTask.planId);
@@ -1205,14 +1438,19 @@ function mergeStates(local, cloud) {
       shieldBreaks: mergeBreaksArrays(localTask.shieldBreaks, cloudTask.shieldBreaks),
     };
   });
-  // 云端有而本地没有的进行中任务 → 补入（已被墓碑标记的跳过，防止刷新后复活）
+  // 云端有而本地没有的进行中任务 → 补入
+  // 墓碑过滤：cloudTask.startTime < tombstonedAt → 是旧任务（僵尸），跳过
+  //           cloudTask.startTime >= tombstonedAt → 任务比墓碑新（重开的合法任务），允许补入
   for (const cloudTask of (cloud.activeTasks || [])) {
-    if (!localActiveMap.has(cloudTask.planId) && !localAbandonedIds.has(cloudTask.planId)) {
-      activeTasks.push(cloudTask);
+    if (!localActiveMap.has(cloudTask.planId)) {
+      const tombstonedAt = tombstoneMap.get(cloudTask.planId);
+      if (!tombstonedAt || cloudTask.startTime >= tombstonedAt) {
+        activeTasks.push(cloudTask);
+      }
     }
   }
-  // abandonedPlanIds：两边取并集（任一设备删除的任务，所有设备都不再恢复）
-  const abandonedPlanIds = [...localAbandonedIds];
+  // abandonedPlanIds：统一输出为新格式对象数组（后续持久化、云同步均使用此格式）
+  const abandonedPlanIds = [...tombstoneMap.entries()].map(([planId, tombstonedAt]) => ({ planId, tombstonedAt }));
 
   // spirits：任意一边 obtained=true 则视为已获得，取最早的 obtainedAt
   const allSpiritKeys = new Set([
@@ -1502,6 +1740,32 @@ async function hydrateFromCloud(uid, dispatch, localFallback, overwriteUserMeta 
 
 export function StoreProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, getLocalState);
+
+  // ── dispatchWithLog：包装 dispatch，对关键 action 写云端日志 ────────────────
+  // 组件侧通过 context 拿到的 dispatch 实际是 dispatchWithLog，零改动。
+  // 日志为 fire-and-forget，不影响任何业务逻辑和性能。
+  const dispatchWithLog = (action) => {
+    dispatch(action);
+    if (!action?.type) return;
+    const uid   = userIdRef.current;
+    const email = authUserRef.current?.email || null;
+    switch (action.type) {
+      case 'START_TASK':
+        cloudLog(uid, email, 'START_TASK', { planId: action.planId, season: action.season });
+        break;
+      case 'COMPLETE_TASK':
+        cloudLog(uid, email, 'COMPLETE_TASK', { planId: action.planId, spiritName: action.spiritName });
+        break;
+      case 'COMPLETE_AND_CONTINUE':
+        cloudLog(uid, email, 'COMPLETE_AND_CONTINUE', { planId: action.planId, spiritName: action.spiritName });
+        break;
+      case 'ABANDON_TASK':
+        cloudLog(uid, email, 'ABANDON_TASK', { planId: action.planId });
+        break;
+      default:
+        break;
+    }
+  };
   // 云同步状态：'idle' | 'syncing' | 'ready' | 'offline'
   const [syncStatus, setSyncStatus] = useState('idle');
   // 当前登录的用户 ID（匿名或正式账号）
@@ -1510,6 +1774,13 @@ export function StoreProvider({ children }) {
   const [authUser, setAuthUser] = useState(null);
   // 是否已完成初始化（防止初始化前的 state 变更触发误写）
   const [initialized, setInitialized] = useState(false);
+  // 用 ref 持有最新 state，供真正有闭包过期问题的函数（onVisibilityChange、attemptReconnect）读取。
+  // 必须用 useLayoutEffect（而非 useEffect）更新，确保在所有子组件 useEffect 执行前完成：
+  // React effect 执行顺序：子组件 useEffect → 父组件 useEffect
+  // 若用 useEffect 更新 ref，Profile 的 pingSync useEffect 执行时 ref 仍是旧值。
+  // useLayoutEffect 在所有 useEffect 之前执行，因此保证 ref 总是最新值。
+  const stateRef = useRef(state);
+  useLayoutEffect(() => { stateRef.current = state; }, [state]);
   // 用 ref 持有最新 userId，避免 onAuthStateChange 闭包过期问题
   const userIdRef = useRef(null);
   // init 是否已经完成（区分 SDK 启动时的自动 SIGNED_IN 与用户操作触发的）
@@ -1580,9 +1851,16 @@ export function StoreProvider({ children }) {
         setUserId(uid);
         setAuthUser(session.user);
 
+        // 记录应用启动日志
+        cloudLog(uid, session.user.email || null, 'APP_OPEN', {
+          isAnonymous: !session.user.email,
+          activeTaskCount: stateRef.current?.activeTasks?.length ?? 0,
+        });
+
         // 2. 从云端拉取或上传数据
         // overwriteUserMeta=false：普通启动，本地已有昵称时不覆盖（保留用户最近改的名）
-        await hydrateFromCloud(uid, dispatch, getLocalState(), false);
+        const hydrateResult = await hydrateFromCloud(uid, dispatch, stateRef.current, false);
+        cloudLog(uid, session.user.email || null, 'HYDRATE', { result: hydrateResult });
         setSyncStatus('ready');
 
         // 2.5. 检查脏标记：上次关闭页面时可能有未上传的数据
@@ -1605,6 +1883,7 @@ export function StoreProvider({ children }) {
         });
       } catch (err) {
         console.warn('[Supabase] 初始化失败，降级为本地模式:', err.message);
+        cloudLog(userIdRef.current, authUserRef.current?.email || null, 'APP_INIT_FAIL', { error: err.message });
         setSyncStatus('offline');
         // 提示用户当前处于本地模式，数据暂不同步
         setAuthToast({ type: 'offline' });
@@ -1713,11 +1992,12 @@ export function StoreProvider({ children }) {
             // overwriteUserMeta=true：uid 变化 = 换设备/找回账号，云端昵称直接覆盖本地
             await hydrateFromCloud(
               uid, dispatch,
-              isSwitching ? buildDefaultState() : getLocalState(),
+              isSwitching ? buildDefaultState() : stateRef.current,
               true
             );
             setSyncStatus('ready');
             if (session.user.email) {
+              cloudLog(uid, session.user.email, isSwitching ? 'AUTH_SWITCH' : 'AUTH_LOGIN', { prevUid });
               setAuthToast({ type: isSwitching ? 'switch' : 'login', email: session.user.email });
               supabase.from('user_data').upsert({
                 user_id: uid,
@@ -1782,7 +2062,45 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     if (!state.userPlanConfig || state.userPlanConfig.length === 0) return;
     dispatch({ type: 'RECONCILE_CUSTOM_FRUITS' });
+
+    // ── 自定义方案精灵名注入到模糊纠偏候选池（响应式补丁，兜底新增/删除方案后的更新）──
+    // getLocalState() 在首次渲染前已同步注入过一次；此处 useEffect 负责响应后续
+    // userPlanConfig 变化（新建/编辑/云端 hydrate），保持候选池与方案数据始终一致。
+    // 幂等：registerUserSpirits 内部用 Set 去重，重复注入同名精灵无副作用。
+    const entries = extractUserSpiritEntries(state.userPlanConfig);
+    if (entries.length > 0) registerUserSpirits(entries);
   }, [state.userPlanConfig]);
+
+  // ── 存量僵尸任务修复：清除 planId 在墓碑中但仍残留于 activeTasks 的任务 ────────
+  // 触发场景：Bug 2（hydrateFromCloud 时序问题）曾让已完成/已放弃的任务重新出现在首页。
+  // abandonedPlanIds 是唯一可信的墓碑来源：凡是 planId 在墓碑里的 activeTask 均为僵尸。
+  // 触发时机：abandonedPlanIds 引用变化（启动加载、hydrate 合并、完成/放弃任务时）。
+  // 幂等保证：reducer 内部发现无僵尸时返回同一 state 引用，不触发 re-render 或持久化。
+  useEffect(() => {
+    if (!state.abandonedPlanIds || state.abandonedPlanIds.length === 0) return;
+    if (!state.activeTasks || state.activeTasks.length === 0) return;
+    // dispatch 前先在 effect 里算出即将被清除的僵尸任务，用于云端日志
+    // （reducer 是纯函数，无法在内部调用 cloudLog）
+    const tombstoneMap = new Map();
+    state.abandonedPlanIds.forEach(e => {
+      if (e && typeof e === 'object' && e.planId) {
+        const ex = tombstoneMap.get(e.planId);
+        if (!ex || e.tombstonedAt > ex) tombstoneMap.set(e.planId, e.tombstonedAt);
+      }
+    });
+    const zombies = state.activeTasks.filter(t => {
+      const at = tombstoneMap.get(t.planId);
+      return at && t.startTime < at;
+    });
+    if (zombies.length > 0) {
+      cloudLog(userIdRef.current, authUserRef.current?.email || null, 'RECONCILE_ZOMBIES', {
+        count: zombies.length,
+        planIds: zombies.map(t => t.planId),
+        startTimes: zombies.map(t => t.startTime),
+      });
+    }
+    dispatch({ type: 'RECONCILE_ACTIVE_TASKS' });
+  }, [state.abandonedPlanIds]);
 
   // ── 持久化：state 变更时同步写 localStorage + 云端 ────────────────────────
   useEffect(() => {
@@ -1839,6 +2157,7 @@ export function StoreProvider({ children }) {
           if (attempt >= 3) {
             // 已重试 3 次仍失败：给用户轻提示，更新最近同步结果
             console.warn('[Supabase] 重试耗尽，数据暂存本地');
+            cloudLog(userIdRef.current, authUserRef.current?.email || null, 'SYNC_FAIL', { error: error.message, attempts: attempt + 1 });
             setLastSyncResult({ status: 'fail', time: new Date() });
             setAuthToast({ type: 'syncError' });
             return;
@@ -1890,7 +2209,7 @@ export function StoreProvider({ children }) {
         const uid = userIdRef.current;
         if (!uid || !initDoneRef.current) return;
         console.log('[Supabase] visibilitychange → visible，拉取云端最新数据');
-        hydrateFromCloud(uid, dispatch, getLocalState(), false).catch(err => {
+        hydrateFromCloud(uid, dispatch, stateRef.current, false).catch(err => {
           console.warn('[Supabase] 切回前台拉取云端数据失败:', err.message);
         });
       }
@@ -1931,10 +2250,11 @@ export function StoreProvider({ children }) {
 
         // 2. 重连成功后用 hydrateFromCloud 拉取云端数据并与本地合并后写回
         // 不能直接 upsert 本地数据：本地可能是空（换设备后 offline），会覆盖云端正确数据
-        await hydrateFromCloud(uid, dispatch, getLocalState(), false);
+        await hydrateFromCloud(uid, dispatch, stateRef.current, false);
 
         // 3. 成功！更新 React state，持久化 effect 之后会自动正常运作
         console.log('[Supabase] offline 重连成功，恢复同步');
+        cloudLog(uid, session.user?.email || null, 'RECONNECT_OK', { retryCount: offlineRetryCountRef.current });
         userIdRef.current = uid;
         authUserRef.current = session.user;
         setUserId(uid);
@@ -2034,13 +2354,21 @@ export function StoreProvider({ children }) {
   // ── 手动触发一次完整双向同步（先拉取云端，再上传合并结果）─────────────────
   // 修复：原先只做上传（doUpsert），当本地数据落后于云端时会把旧数据覆盖云端新数据。
   // 正确流程：hydrate（拉取并合并）→ 持久化 effect 自动触发 upsert（上传合并结果）
-  // 调用场景：Profile 页「同步失败，点击重试」按钮 / 页面切回前台
+  // 调用场景：Profile 页「同步失败，点击重试」按钮 / pingSync（进入「我的」页）
+  //
+  // ⚠️ 重要：这里必须用闭包的 `state`，而不是 stateRef.current。
+  // 原因：React effects 执行顺序是子组件先于父组件。Profile 的 useEffect（调用 pingSync）
+  // 比 StoreProvider 的 `useEffect(() => { stateRef.current = state }, [state])` 先执行，
+  // 导致 pingSync 被调用时 stateRef.current 仍是旧值。
+  // doFullSync 在每次 StoreProvider 渲染时重新创建，闭包里的 `state` 始终是当前帧最新值，
+  // 可以安全直接使用，无需 ref 中转。
   const doFullSync = async () => {
     const uid = userIdRef.current;
     if (!uid) { retryOfflineNow(); return; }
     setLastSyncResult({ status: 'pending', time: new Date() });
     try {
-      await hydrateFromCloud(uid, dispatch, getLocalState(), false);
+      // 使用闭包 state（当前渲染帧最新值），而非 stateRef.current（可能是旧渲染帧）
+      await hydrateFromCloud(uid, dispatch, state, false);
       // hydrate 成功后 state 会更新，持久化 effect 会自动上传，无需手动 doUpsert
       setLastSyncResult({ status: 'success', time: new Date() });
     } catch (err) {
@@ -2079,7 +2407,7 @@ export function StoreProvider({ children }) {
   // ── 三池保底计数（从事件流实时派生，随 activeTasks / completedTasks 自动更新）──
   const allPlans = useMemo(() => [
     ...PLANS,
-    ...S2_PLANS,
+    ...S3_PLANS,
     ...(state.userPlanConfig || []).filter(p => !p.deleted),
   ], [state.userPlanConfig]);
 
@@ -2091,7 +2419,7 @@ export function StoreProvider({ children }) {
   );
 
   return (
-    <StoreContext.Provider value={{ state, dispatch, syncStatus, userId, authUser, authToast, clearAuthToast: () => setAuthToast(null), forceSyncNow, setAuthMode, retryOfflineNow, lastSyncResult, retrySyncNow, pingSync, poolCounts }}>
+    <StoreContext.Provider value={{ state, dispatch: dispatchWithLog, syncStatus, userId, authUser, authToast, clearAuthToast: () => setAuthToast(null), forceSyncNow, setAuthMode, retryOfflineNow, lastSyncResult, retrySyncNow, pingSync, poolCounts }}>
       {children}
     </StoreContext.Provider>
   );

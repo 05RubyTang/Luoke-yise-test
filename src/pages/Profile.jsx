@@ -10,7 +10,7 @@ import SpiritAvatar from '../components/SpiritAvatar';
 import ShieldDots from '../components/ShieldDots';
 import { PLANS, ALL_SHINIES, inferPoolType, POOL_TYPE_CONFIG, getBallBySpirit, getBallByPlan, getAttrIdBySpirit, getPlanAttrId, computeFamilyPool, ATTR_LABEL, computePoolCounts, classifyResultType, resolveTaskSeasonFromPlans, fuzzyResolveSpiritName } from '../data/plans';
 import { SEASONS } from '../data/seasons';
-import { S2_PLANS } from '../data/seasons/s2Plans';
+import { S3_PLANS } from '../data/plans';
 
 // 模块加载时计算一次，每次 Vite 重新构建值变化 → 强制浏览器放弃旧缓存
 const _HERO_CARD_V = Date.now();
@@ -80,7 +80,6 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
 
   const base = import.meta.env.BASE_URL;
   const plan = PLANS.find(p => p.id === task.planId)
-    || S2_PLANS.find(p => p.id === task.planId)
     || (userPlanConfig || []).find(p => p.id === task.planId) || null;
   // display-time 精灵名纠偏：不改 store，只修正展示用的名字
   const { resolved: displaySpirit } = fuzzyResolveSpiritName(task.resultSpirit || '');
@@ -478,9 +477,159 @@ function TaskDetailPage({ task, onBack, userPlanConfig }) {
   );
 }
 
+// ─── 修改精灵名弹窗 ──────────────────────────────────────────────────────────
+
+function EditSpiritNameModal({ task, allTasks, userPlanConfig, onClose }) {
+  const { dispatch } = useStore();
+  const [newName, setNewName] = useState(task.resultSpirit || '');
+  const [batchMode, setBatchMode] = useState(true); // 默认勾选按方案批量
+  const inputRef = useRef(null);
+
+  // 同方案 + 同旧名的记录数
+  const oldName = task.resultSpirit || '';
+  const samePlanSameNameTasks = allTasks.filter(
+    t => t.planId === task.planId && t.resultSpirit === oldName && t.id !== task.id
+  );
+  const batchCount = samePlanSameNameTasks.length;
+
+  useEffect(() => {
+    // 弹窗打开后自动聚焦输入框并全选
+    setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 100);
+  }, []);
+
+  const handleConfirm = () => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) {
+      onClose();
+      return;
+    }
+    // 收集要修改的 taskIds
+    const taskIds = [task.id];
+    if (batchMode && batchCount > 0) {
+      samePlanSameNameTasks.forEach(t => taskIds.push(t.id));
+    }
+    dispatch({ type: 'UPDATE_COMPLETED_SPIRIT', taskIds, newSpiritName: trimmed });
+    onClose();
+  };
+
+  return createPortal(
+    <div
+      className="modal-overlay modal-overlay--no-tab"
+      onClick={onClose}
+    >
+      <div
+        className="modal-content"
+        onClick={e => e.stopPropagation()}
+        style={{ maxHeight: '70vh', overflowY: 'auto' }}
+      >
+        <div className="modal-handle" />
+
+        {/* 标题 */}
+        <div style={{
+          fontSize: 16, fontWeight: 900, color: '#2B2A2E',
+          fontFamily: 'var(--font-display)',
+          textAlign: 'center', marginBottom: 16,
+        }}>修改精灵名</div>
+
+        {/* 当前精灵名展示 */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          marginBottom: 14,
+          padding: '8px 12px',
+          background: '#F0E8D5', borderRadius: 10,
+        }}>
+          <SpiritAvatar name={fuzzyResolveSpiritName(oldName).resolved} obtained size={36} showName={false} />
+          <div>
+            <div style={{ fontSize: 10, color: '#A09080', fontWeight: 600 }}>当前记录为</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>{oldName}</div>
+          </div>
+        </div>
+
+        {/* 新精灵名输入 */}
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#675D53', marginBottom: 6 }}>修改为</div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={newName}
+            onChange={e => setNewName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleConfirm(); }}
+            placeholder="输入正确的精灵名"
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '10px 14px', borderRadius: 10,
+              border: '2px solid rgba(200,131,10,0.4)',
+              background: '#FFFBF0',
+              fontSize: 15, fontWeight: 800, fontFamily: 'var(--font-display)',
+              color: '#2B2A2E', outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* 按方案批量勾选 */}
+        {batchCount > 0 && (
+          <label style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            padding: '10px 12px', marginBottom: 14,
+            background: 'rgba(91,156,246,0.06)',
+            border: '1px solid rgba(91,156,246,0.25)',
+            borderRadius: 10, cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox"
+              checked={batchMode}
+              onChange={e => setBatchMode(e.target.checked)}
+              style={{ marginTop: 2, accentColor: '#5B9CF6', width: 16, height: 16, flexShrink: 0 }}
+            />
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: '#2B2A2E' }}>
+                同时修改本方案中所有「{oldName}」记录
+              </div>
+              <div style={{ fontSize: 10, color: '#5B9CF6', fontWeight: 600, marginTop: 2 }}>
+                还有 {batchCount} 条同名记录将一并修改
+              </div>
+            </div>
+          </label>
+        )}
+
+        {/* 操作按钮 */}
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '11px 0',
+              border: '1.5px solid rgba(103,93,83,0.3)', borderRadius: 10,
+              background: 'var(--card-inner)', color: 'var(--text-muted)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >取消</button>
+          <button
+            onClick={handleConfirm}
+            disabled={!newName.trim() || newName.trim() === oldName}
+            style={{
+              flex: 1, padding: '11px 0',
+              border: '2px solid #2B2A2E', borderRadius: 10,
+              background: '#2B2A2E', color: '#FBF7EC',
+              fontSize: 13, fontWeight: 800, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              boxShadow: '0 2px 0 #111014',
+              opacity: (!newName.trim() || newName.trim() === oldName) ? 0.4 : 1,
+            }}
+          >确认修改{batchMode && batchCount > 0 ? `（${batchCount + 1}条）` : ''}</button>
+        </div>
+      </div>
+    </div>,
+    getModalRoot()
+  );
+}
+
 // ─── 历史卡片（从 History.jsx 迁移，保持完全一致）──────────────────────────
 
-function HistoryCard({ task, index, userPlanConfig, onDetail }) {
+function HistoryCard({ task, index, userPlanConfig, allTasks, onDetail }) {
   const { dispatch } = useStore();
   const plan = PLANS.find(p => p.id === task.planId)
     || (userPlanConfig || []).find(p => p.id === task.planId) || null;
@@ -497,6 +646,7 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
   const shiny = breakdowns.shiny || 0;
 
   const [editing, setEditing] = useState(false);
+  const [editSpiritOpen, setEditSpiritOpen] = useState(false);
   const [inputs, setInputs] = useState({
     shieldBreakCount: '',
     polluted: '',
@@ -556,17 +706,37 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
     <div className="card animate-in" style={{ animationDelay: `${index * 0.04}s` }}>
       {/* 顶部行 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: 12,
-          background: '#F0E8D5', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden',
-        }}>
-          {isSuccess
-            ? <SpiritAvatar name={displaySpirit} obtained size={44} showName={false} />
-            : plan ? <PlanIcon plan={plan} size={30} /> : <span style={{ fontSize: 22 }}>?</span>
-          }
-        </div>
+        {isSuccess ? (
+          <div
+            onClick={() => setEditSpiritOpen(true)}
+            style={{
+              width: 48, height: 48, borderRadius: 12,
+              background: '#F0E8D5', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              overflow: 'hidden', cursor: 'pointer',
+              position: 'relative',
+              border: '1.5px solid rgba(200,131,10,0.25)',
+            }}
+            title="点击修改精灵名"
+          >
+            <SpiritAvatar name={displaySpirit} obtained size={44} showName={false} />
+            <div style={{
+              position: 'absolute', bottom: -1, left: 0, right: 0,
+              textAlign: 'center', fontSize: 7, fontWeight: 700,
+              color: '#C8830A', background: 'rgba(240,232,213,0.92)',
+              lineHeight: 1.6, letterSpacing: 0.3,
+            }}>改名</div>
+          </div>
+        ) : (
+          <div style={{
+            width: 48, height: 48, borderRadius: 12,
+            background: '#F0E8D5', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
+          }}>
+            {plan ? <PlanIcon plan={plan} size={30} /> : <span style={{ fontSize: 22 }}>?</span>}
+          </div>
+        )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 15, fontWeight: 900, fontFamily: 'var(--font-display)',
@@ -849,6 +1019,16 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
           >查看详情 →</button>
         </div>
       )}
+
+      {/* 修改精灵名弹窗 */}
+      {editSpiritOpen && (
+        <EditSpiritNameModal
+          task={task}
+          allTasks={allTasks || []}
+          userPlanConfig={userPlanConfig}
+          onClose={() => setEditSpiritOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -993,6 +1173,35 @@ function AvatarUploader({ avatarUrl, onFileChange }) {
 // ─── 更新公告弹窗 ─────────────────────────────────────────────────────────────
 
 const CHANGELOG = [
+  {
+    version: 'v4.5',
+    date: '2026-07-10',
+    tags: ['新赛季', '数据'],
+    items: [
+      'S3「铅字幻梦」赛季上线：新增 18 个 S3 刷取方案（8 个常驻异色单刷 + 2 个战令异色 + 8 个赛季奇遇 + 多套属性混刷）',
+      '果实攻略全面更新 S3 内容：「抓取获得」新增 8 只 S3 常驻异色果实，「赛季&活动」新增 S3 奇遇精灵分组（8只，紫色主题），「战令/购买」新增离心舞者/胡桃王子 S3 战令果实',
+      '赛季切换器支持 S3 / S2 / S1 三赛季独立查看，S3 采用紫色主题配色',
+    ],
+  },
+  {
+    version: 'v4.4',
+    date: '2026-06-03',
+    tags: ['新方案', '数据', '修复'],
+    items: [
+      'S2 新增「单刷噼啪鸟」方案：噼啪鸟为电+翼双属精灵，果实来源易获取',
+      '果实攻略新增「幽影树果实」（S2 常驻异色）：幽+草双属，可配合幽系 / 草系混刷方案',
+      '修复「刷取详情」页底部 TabBar 遮挡问题：详情页现在会完整覆盖底部导航栏',
+    ],
+  },
+  {
+    version: 'v4.3',
+    date: '2026-05-30',
+    tags: ['新功能', '优化'],
+    items: [
+      '图鉴支持手动标记已获得：点开任意精灵详情，可直接标记 / 取消「已获得」，方便懒得逐条记录的同学快速更新收集进度',
+      '出异色填写精灵名支持自动预填和同家族识别：系统会根据当前刷取方案自动推荐目标精灵名，输入模糊名也能识别同家族成员并自动补全',
+    ],
+  },
   {
     version: 'v4.2',
     date: '2026-05-26',
@@ -1771,14 +1980,23 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
             ))}
           </div>
 
-          {/* ━━ 4. 三池保底总览 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {/* ━━ 4. 池保底总览（跟随当前赛季切换） ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           {(() => {
-            // 所有方案（含 S1 内置 + S2 + 自定义）
-            const allPlans = [...PLANS, ...S2_PLANS, ...(state.userPlanConfig || [])];
+            // 当前选中赛季（由 SeasonSwitcher 控制）
+            const currentSeason = state.currentSeason || 'S3';
+
+            // 赛季配色
+            const SEASON_STYLE_MAP = {
+              S3: { accentColor: '#7B1FA2', accentBg: 'rgba(123,31,162,0.1)', name: '铅字幻梦' },
+              S2: { accentColor: '#C0562A', accentBg: 'rgba(232,115,58,0.12)', name: '狂欢怪谈' },
+              S1: { accentColor: '#4A80D0', accentBg: 'rgba(91,156,246,0.12)', name: '暗夜拾光' },
+            };
+            const { accentColor, accentBg, name: seasonName } = SEASON_STYLE_MAP[currentSeason] || SEASON_STYLE_MAP.S3;
+
+            // 只计算当前赛季的池进度
+            const allPlans = [...PLANS, ...S3_PLANS, ...(state.userPlanConfig || [])];
             const activeTasks = state.activeTasks || [];
-            // 分别计算 S1 / S2 两个赛季的池子进度
-            const s1Counts = computePoolCounts(activeTasks, state.completedTasks, allPlans, 'S1');
-            const s2Counts = computePoolCounts(activeTasks, state.completedTasks, allPlans, 'S2');
+            const curCounts = computePoolCounts(activeTasks, state.completedTasks, allPlans, currentSeason);
 
             const POOL_LIMIT = { family: 70, attr: 80, world: 80 };
 
@@ -1810,99 +2028,28 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
               );
             };
 
-            // ── 构建单个赛季的展示条目 ───────────────────────────────────────────
-            const buildSeasonSection = (seasonKey, counts, accentColor, accentBg) => {
-              const attrEntries = Object.entries(counts.attrPools || {})
-                .filter(([, v]) => v > 0)
-                .map(([attrId, count]) => {
-                  const plan = allPlans.find(p => getPlanAttrId(p) === attrId || p.id === attrId);
-                  return { attrId, count, plan };
-                });
+            // ── 当前赛季各池数据 ─────────────────────────────────────────────────
+            const attrEntries = Object.entries(curCounts.attrPools || {})
+              .filter(([, v]) => v > 0)
+              .map(([attrId, count]) => {
+                const plan = allPlans.find(p => getPlanAttrId(p) === attrId || p.id === attrId);
+                return { attrId, count, plan };
+              });
 
-              const familyEntries = activeTasks
-                // 与 computePoolCounts 保持同一口径：优先读方案的 season，兜底读 task.season
-                // 避免 task.season 历史写错导致 S2 任务被误归到 S1 家族池
-                .filter(t => {
-                  const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
-                  return (effectiveSeason || 'S1') === seasonKey;
-                })
-                .map(t => {
-                  const plan = allPlans.find(p => p.id === t.planId) || null;
-                  const count = plan ? computeFamilyPool(t, plan) : 0;
-                  return { task: t, plan, count };
-                })
-                .filter(e => e.count > 0);
+            const familyEntries = activeTasks
+              .filter(t => {
+                const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlans);
+                return (effectiveSeason || 'S3') === currentSeason;
+              })
+              .map(t => {
+                const plan = allPlans.find(p => p.id === t.planId) || null;
+                const count = plan ? computeFamilyPool(t, plan) : 0;
+                return { task: t, plan, count };
+              })
+              .filter(e => e.count > 0);
 
-              const worldPool = counts.worldPool || 0;
-              const hasAny = worldPool > 0 || attrEntries.length > 0 || familyEntries.length > 0;
-
-              return (
-                <div key={seasonKey} style={{ marginBottom: 4 }}>
-                  {/* 赛季小标题 */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    margin: '8px 0 2px',
-                  }}>
-                    <span style={{
-                      fontSize: 9, fontWeight: 800,
-                      padding: '1px 6px', borderRadius: 8,
-                      background: accentBg,
-                      color: accentColor,
-                      border: `1px solid ${accentColor}55`,
-                      letterSpacing: 0.3,
-                    }}>{seasonKey}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
-                      {seasonKey === 'S2' ? '狂欢怪谈' : '暗夜拾光'}
-                    </span>
-                    {!hasAny && (
-                      <span style={{ fontSize: 9, color: 'var(--text-light)', fontWeight: 500, marginLeft: 4 }}>暂无进度</span>
-                    )}
-                  </div>
-
-                  {hasAny ? (
-                    <>
-                      {familyEntries.map(({ task, plan, count }) => (
-                        <PoolRow
-                          key={task.id}
-                          icon={plan?.iconImg || null}
-                          label={`${plan?.type || task.planId} 家族`}
-                          color="#C8830A"
-                          count={count}
-                          limit={POOL_LIMIT.family}
-                        />
-                      ))}
-                      {attrEntries.map(({ attrId, count, plan }) => (
-                        <PoolRow
-                          key={attrId}
-                          icon={plan?.iconImg || null}
-                          label={`${ATTR_LABEL[attrId] || attrId} 系别`}
-                          color={plan?.color || '#E8A020'}
-                          count={count}
-                          limit={POOL_LIMIT.attr}
-                        />
-                      ))}
-                      <PoolRow
-                        icon={null}
-                        label="世界池"
-                        color="#7E57C2"
-                        dotColor="#7E57C2"
-                        count={worldPool}
-                        limit={POOL_LIMIT.world}
-                      />
-                    </>
-                  ) : (
-                    <div style={{ height: 2 }} />
-                  )}
-                </div>
-              );
-            };
-
-            const hasAnyGlobal = (s1Counts.worldPool > 0 || Object.values(s1Counts.attrPools || {}).some(v => v > 0))
-              || (s2Counts.worldPool > 0 || Object.values(s2Counts.attrPools || {}).some(v => v > 0))
-              || activeTasks.length > 0;
-            const totalRows = (Object.values(s1Counts.attrPools || {}).filter(v => v > 0).length + 1)
-              + (Object.values(s2Counts.attrPools || {}).filter(v => v > 0).length + 1)
-              + activeTasks.length;
+            const worldPool = curCounts.worldPool || 0;
+            const hasAny = worldPool > 0 || attrEntries.length > 0 || familyEntries.length > 0;
 
             return (
               <div
@@ -1930,9 +2077,19 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                     style={{ width: 18, height: 18, objectFit: 'contain', flexShrink: 0 }}
                   />
                   <span style={{ fontSize: 13, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>各池保底进度实时情况</span>
+                  {/* 当前赛季标签 */}
+                  <span style={{
+                    fontSize: 9, fontWeight: 800,
+                    padding: '1px 6px', borderRadius: 8,
+                    background: accentBg,
+                    color: accentColor,
+                    border: `1px solid ${accentColor}55`,
+                    letterSpacing: 0.3,
+                    flexShrink: 0,
+                  }}>{currentSeason}</span>
                   {!poolOverviewExpanded && (
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, marginLeft: 2 }}>
-                      {hasAnyGlobal ? `S1 · S2 分开统计` : '暂无进度，点击查看说明'}
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500 }}>
+                      {hasAny ? seasonName : '暂无进度'}
                     </span>
                   )}
                   <img
@@ -1950,17 +2107,57 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
 
                 {poolOverviewExpanded && (
                   <>
-                    {/* S2 赛季进度（放前面，当前赛季优先） */}
-                    {buildSeasonSection('S2', s2Counts, '#C0562A', 'rgba(232,115,58,0.12)')}
+                    {/* 赛季小标题 */}
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      margin: '6px 0 2px',
+                    }}>
+                      <span style={{
+                        fontSize: 9, fontWeight: 800,
+                        padding: '1px 6px', borderRadius: 8,
+                        background: accentBg,
+                        color: accentColor,
+                        border: `1px solid ${accentColor}55`,
+                        letterSpacing: 0.3,
+                      }}>{currentSeason}</span>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{seasonName}</span>
+                      {!hasAny && (
+                        <span style={{ fontSize: 9, color: 'var(--text-light)', fontWeight: 500, marginLeft: 4 }}>暂无进度</span>
+                      )}
+                    </div>
 
-                    {/* 分隔线 */}
-                    <div style={{ height: 1, background: 'rgba(103,93,83,0.1)', margin: '4px 0' }} />
-
-                    {/* S1 赛季进度 */}
-                    {buildSeasonSection('S1', s1Counts, '#4A80D0', 'rgba(91,156,246,0.12)')}
-
-                    {/* 无数据时的提示 */}
-                    {!hasAnyGlobal && (
+                    {hasAny ? (
+                      <>
+                        {familyEntries.map(({ task, plan, count }) => (
+                          <PoolRow
+                            key={task.id}
+                            icon={plan?.iconImg || null}
+                            label={`${plan?.type || task.planId} 家族`}
+                            color="#C8830A"
+                            count={count}
+                            limit={POOL_LIMIT.family}
+                          />
+                        ))}
+                        {attrEntries.map(({ attrId, count, plan }) => (
+                          <PoolRow
+                            key={attrId}
+                            icon={plan?.iconImg || null}
+                            label={`${ATTR_LABEL[attrId] || attrId} 系别`}
+                            color={plan?.color || '#E8A020'}
+                            count={count}
+                            limit={POOL_LIMIT.attr}
+                          />
+                        ))}
+                        <PoolRow
+                          icon={null}
+                          label="世界池"
+                          color="#7E57C2"
+                          dotColor="#7E57C2"
+                          count={worldPool}
+                          limit={POOL_LIMIT.world}
+                        />
+                      </>
+                    ) : (
                       <div style={{
                         fontSize: 10, color: 'var(--text-muted)', fontWeight: 500,
                         marginTop: 8, marginBottom: 2, lineHeight: 1.7,
@@ -1973,7 +2170,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
 
                     {/* 底部说明 */}
                     <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 500, marginTop: 6, marginBottom: 2, lineHeight: 1.5 }}>
-                      · 家族池绑定当前任务，出货后重置 · 系别池 / 世界池跨任务累计，最近一次同池出货后自动清零 · S1/S2 进度分开统计互不影响
+                      · 家族池绑定当前任务，出货后重置 · 系别池 / 世界池跨任务累计，最近一次同池出货后自动清零 · 随顶部赛季切换联动
                     </div>
                   </>
                 )}
@@ -2033,7 +2230,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                       padding: '9px 0', borderBottom: '1px solid var(--divider)',
                     }}>
                       <span style={{ fontSize: 12, color: 'var(--text-light)', fontWeight: 500 }}>版本</span>
-                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.2</span>
+                      <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>v4.4</span>
                     </div>
                     <div
                       style={{
@@ -2329,43 +2526,56 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                 overflowX: 'auto', paddingBottom: 2,
               }}>
                 {[
-                  { key: 'all', label: '全部', emoji: '📋' },
-                  { key: 'S2',  label: 'S2 狂欢怪谈', emoji: '🎪' },
-                  { key: 'S1',  label: 'S1 暗夜拾光', emoji: '🌙' },
-                ].map(({ key, label, emoji }) => {
-                  const isActive = historySeasonFilter === key;
-                  const isS2Tab = key === 'S2';
-                  const accentColor = isS2Tab ? '#E8733A' : key === 'S1' ? '#8B7355' : '#675D53';
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setHistorySeasonFilter(key)}
-                      style={{
-                        flexShrink: 0,
-                        padding: '5px 12px', borderRadius: 20,
-                        border: `1.5px solid ${isActive ? accentColor : 'rgba(103,93,83,0.2)'}`,
-                        background: isActive
-                          ? (isS2Tab ? 'rgba(232,115,58,0.12)' : key === 'S1' ? 'rgba(139,115,85,0.1)' : 'rgba(103,93,83,0.08)')
-                          : 'var(--card-inner)',
-                        color: isActive ? accentColor : 'var(--text-muted)',
-                        fontSize: 11, fontWeight: isActive ? 800 : 600,
-                        cursor: 'pointer', fontFamily: 'var(--font-body)',
-                        transition: 'all 0.15s',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}
-                    >
-                      <span>{emoji}</span>
-                      <span>{label}</span>
-                    </button>
-                  );
-                })}
+                   { key: 'all', label: '全部', emoji: '📋' },
+                   { key: 'S3',  label: 'S3 铅字幻梦', emoji: '📖' },
+                   { key: 'S2',  label: 'S2 狂欢怪谈', emoji: '🎪' },
+                   { key: 'S1',  label: 'S1 暗夜拾光', emoji: '🌙' },
+                 ].map(({ key, label, emoji }) => {
+                   const isActive = historySeasonFilter === key;
+                   const isS3Tab = key === 'S3';
+                   const isS2Tab = key === 'S2';
+                   const accentColor = isS3Tab ? '#7B1FA2' : isS2Tab ? '#E8733A' : key === 'S1' ? '#8B7355' : '#675D53';
+                   return (
+                     <button
+                       key={key}
+                       onClick={() => setHistorySeasonFilter(key)}
+                       style={{
+                         flexShrink: 0,
+                         padding: '5px 12px', borderRadius: 20,
+                         border: `1.5px solid ${isActive ? accentColor : 'rgba(103,93,83,0.2)'}`,
+                         background: isActive
+                           ? (isS3Tab ? 'rgba(123,31,162,0.1)' : isS2Tab ? 'rgba(232,115,58,0.12)' : key === 'S1' ? 'rgba(139,115,85,0.1)' : 'rgba(103,93,83,0.08)')
+                           : 'var(--card-inner)',
+                         color: isActive ? accentColor : 'var(--text-muted)',
+                         fontSize: 11, fontWeight: isActive ? 800 : 600,
+                         cursor: 'pointer', fontFamily: 'var(--font-body)',
+                         transition: 'all 0.15s',
+                         display: 'flex', alignItems: 'center', gap: 4,
+                       }}
+                     >
+                       <span>{emoji}</span>
+                       <span>{label}</span>
+                     </button>
+                   );
+                 })}
               </div>
 
               {/* ── 记录列表（按赛季过滤） ── */}
               {(() => {
+                const allPlansForFilter = [...PLANS, ...S3_PLANS, ...(state.userPlanConfig || [])];
+                const S2_START = SEASONS.S2.startDate;
+                const S3_START = SEASONS.S3?.startDate;
                 const filteredTasks = historySeasonFilter === 'all'
                   ? tasks
-                  : tasks.filter(t => (t.season || 'S1') === historySeasonFilter);
+                  : tasks.filter(t => {
+                      const effectiveSeason = resolveTaskSeasonFromPlans(t, allPlansForFilter);
+                      if (effectiveSeason) return effectiveSeason === historySeasonFilter;
+                      // 无法识别赛季 → 按 completedAt 时间三段判断（S3 优先，其次 S2，其余 S1）
+                      const resolved = (S3_START && t.completedAt && t.completedAt >= S3_START)
+                        ? 'S3'
+                        : (t.completedAt && t.completedAt >= S2_START) ? 'S2' : 'S1';
+                      return resolved === historySeasonFilter;
+                    });
                 return (
                   <>
                     <div style={{ margin: '0 16px 6px', fontSize: 11, color: 'var(--text-light)', fontWeight: 700, letterSpacing: 1 }}>
@@ -2380,6 +2590,7 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
                         <HistoryCard
                           key={task.id || i} task={task} index={i}
                           userPlanConfig={state.userPlanConfig}
+                          allTasks={tasks}
                           onDetail={task.resultType !== 'abandoned' ? () => openDetail(task) : null}
                         />
                       ))
@@ -2393,9 +2604,12 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
       )}
 
       {/* ══ 子页：刷取详情（全页面） ═══════════════════════════════════════════ */}
-      {subPage === 'detail' && detailTask && (
+      {/* 用 createPortal 挂到 #modal-root（app-content 直接子节点），
+          避免被 page-container 的 stacking context 限制，
+          使 zIndex:1000 能正确覆盖 TabBar（z-index:100） */}
+      {subPage === 'detail' && detailTask && createPortal(
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 900,
+          position: 'fixed', inset: 0, zIndex: 1000,
           overflowY: 'auto',
         }}>
           <TaskDetailPage
@@ -2403,7 +2617,8 @@ export default function Profile({ navigate, initialDetailTaskId = null }) {
             onBack={closeDetail}
             userPlanConfig={state.userPlanConfig}
           />
-        </div>
+        </div>,
+        getModalRoot()
       )}
 
       {/* 更新公告弹窗 */}

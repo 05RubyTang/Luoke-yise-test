@@ -1,0 +1,46 @@
+name: 构建并部署到 GitHub Pages
+
+on:
+  push:
+    branches: [main]   # 推送到 main 分支时自动触发
+  workflow_dispatch:   # 也支持在 GitHub 网页上手动触发
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取源码
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # 2. 安装 Node.js（版本与本地保持一致）
+      - name: 配置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      # 3. 安装依赖（使用 ci 保证与 lock 文件严格一致）
+      - name: 安装依赖
+        run: npm ci
+
+      # 4. 构建（注入生产环境变量，Supabase Key 从仓库 Secrets 读取）
+      - name: 构建生产包
+        run: npm run build
+        env:
+          VITE_BASE_PATH: /yise-Luoke-v2.0-ruby-s/
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      # 5. 将 dist/ 推送到「部署仓库」的 gh-pages 分支
+      #    DEPLOY_TOKEN 是一个有 repo 权限的 Personal Access Token（PAT）
+      #    需要在 GitHub → Settings → Secrets 里添加
+      - name: 部署到 gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.DEPLOY_TOKEN }}
+          external_repository: 05RubyTang/yise-Luoke-v2.0-ruby-s
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          commit_message: '🚀 自动部署 ${{ github.sha }}'

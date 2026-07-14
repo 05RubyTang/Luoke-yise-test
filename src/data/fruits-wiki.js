@@ -190,6 +190,8 @@ export const FRUITS_WIKI_IMG = {
 
   // 毒系（厉毒修萝 = 厉毒小萝同家族）
   "厉毒修萝果实": "https://patchwiki.biligame.com/images/rocom/8/85/kmne5hstyb8itjy9btrxyke9teixr5a.png", // 同家族：厉毒小萝果实
+  // 毒系（栗鼠 = 壳栗丝鼠进化前形态，bwiki 暂无独立页面，暂用奔波鼠果实图兜底）
+  "栗鼠果实":     "https://patchwiki.biligame.com/images/rocom/6/6e/c09ln0jbtvyfpvwrexveadpdd476xe4.png", // 待 bwiki 收录后替换为真实 URL
 
   // 冰系（电企鹅 = 小电企鹅同家族）
   "电企鹅果实":   "https://patchwiki.biligame.com/images/rocom/e/eb/2ko1xdzesjhz4kd02yein10nyr7szfj.png", // 同家族：小电企鹅果实
@@ -206,6 +208,14 @@ export const FRUITS_WIKI_IMG = {
   // 疾光千兽 = 犀角鸟同家族；绒仙子 = 绒绒同家族
   "疾光千兽果实": "https://patchwiki.biligame.com/images/rocom/b/ba/0odp3a4u6lcr4iq692dewhef6oilatp.png", // 同家族：犀角鸟果实
   "绒仙子果实":   "https://patchwiki.biligame.com/images/rocom/4/4d/ki369linoroontjldq0l64s8dfehl43.png", // 同家族：绒绒果实
+
+  // ─── S3 新命名果实（bwiki 暂无独立页面，用同家族老图兜底；CDN 上传新命名图后可移除） ───
+  "蜜果骸果实":   "https://patchwiki.biligame.com/images/rocom/6/6a/lk9g4nqwq25yevkdhu44n41bzwpnvmp.png", // 兜底：小灵面果实（同幽系，作占位）
+  "稻草人果实":   "https://patchwiki.biligame.com/images/rocom/9/9f/p2jj1xasdvrd1a8xb3i1czhgwrf6kx4.png", // 兜底：兽花蕾果实（同萌系，作占位）
+  "苞米仔果实":   "https://patchwiki.biligame.com/images/rocom/6/6e/a0ysaz4or3jvrzc7r0jqr3hgjwjvmmv.png", // 兜底：蹦蹦种子果实（同草系，作占位）
+  "守夜烛果实":   "https://patchwiki.biligame.com/images/rocom/0/02/1d8mf46v3fcrhlcr7klzt5g76t1y9i5.png", // 兜底：火尾瓦特果实（同火系，作占位）
+  "卡波果实":     "https://patchwiki.biligame.com/images/rocom/c/c5/n5bff9tdjjwazpxk8esoo8up0f6ag3m.png", // 卡波→卡拉波斯（S3 恶系奇遇）
+  "卡拉果实":     "https://patchwiki.biligame.com/images/rocom/c/c5/n5bff9tdjjwazpxk8esoo8up0f6ag3m.png", // 兼容旧名，指向同一张图
 };
 
 /**

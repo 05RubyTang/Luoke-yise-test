@@ -36,8 +36,10 @@ function FruitPendingPlaceholder({ size = 38 }) {
       borderRadius: size * 0.22,
       background: 'linear-gradient(135deg, rgba(103,93,83,0.10) 0%, rgba(103,93,83,0.06) 100%)',
       border: '1.5px dashed rgba(103,93,83,0.35)',
+      flexDirection: 'column', gap: 0,
     }}>
-      <span style={{ fontSize: size * 0.38, opacity: 0.4 }}>?</span>
+      <span style={{ fontSize: size * 0.22, lineHeight: 1.2, opacity: 0.45, textAlign: 'center', whiteSpace: 'nowrap' }}>等官方</span>
+      <span style={{ fontSize: size * 0.22, lineHeight: 1.2, opacity: 0.45, textAlign: 'center', whiteSpace: 'nowrap' }}>更新</span>
     </span>
   );
 }

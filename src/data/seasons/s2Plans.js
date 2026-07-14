@@ -149,7 +149,7 @@ export const S2_PLANS = [
     icon: '❄️',
     iconImg: `${base}attrs/ice.png`,
     color: '#42A5F5',
-    fruitA: '雪怪果实',
+    fruitA: '小雪人果实',
     fruitB: null,
     spiritA: '雪怪',
     spiritB: null,
@@ -187,7 +187,7 @@ export const S2_PLANS = [
     icon: '😈',
     iconImg: `${base}attrs/evil.png`,
     color: '#F48FB1',
-    fruitA: '小丑公爵果实',
+    fruitA: '小丑豆豆果实',
     fruitB: null,
     spiritA: '小丑公爵',
     spiritB: null,
@@ -223,7 +223,7 @@ export const S2_PLANS = [
     icon: '⚪',
     iconImg: `${base}attrs/normal.png`,
     color: '#F48FB1',
-    fruitA: null,       // 音碟吼果实暂未上线，无法单刷
+    fruitA: '猴麦仔果实',
     fruitB: null,
     spiritA: '音碟吼',
     spiritB: null,
@@ -241,7 +241,7 @@ export const S2_PLANS = [
     icon: '🔥',
     iconImg: `${base}attrs/fire.png`,
     color: '#F48FB1',
-    fruitA: '烟花伯爵果实',
+    fruitA: '烟花团果实',
     fruitB: null,
     spiritA: '烟花伯爵',
     spiritB: null,
@@ -259,7 +259,7 @@ export const S2_PLANS = [
     icon: '🔮',
     iconImg: `${base}attrs/phantom.png`,
     color: '#F48FB1',
-    fruitA: '帅帅魔偶果实',
+    fruitA: '牵线木偶果实',
     fruitB: null,
     spiritA: '帅帅魔偶',
     spiritB: null,
@@ -313,7 +313,7 @@ export const S2_PLANS = [
     icon: '👻',
     iconImg: `${base}attrs/ghost.png`,
     color: '#F48FB1',
-    fruitA: '咕德帽帽果实',
+    fruitA: '咕咕帽果实',
     fruitB: null,
     spiritA: '咕德帽帽',
     spiritB: null,
@@ -363,7 +363,7 @@ export const S2_PLANS = [
     unlockB: null,
   },
 
-  // 3. 普通系：公平鸽（音碟吼果实暂未上线，仅用公平鸽果实单果）
+  // 3. 普通系：公平鸽 + 猴麦仔双果混刷
   {
     id: 's2_attr_normal',
     season: 'S2',
@@ -373,12 +373,12 @@ export const S2_PLANS = [
     iconImg: `${base}attrs/normal.png`,
     color: '#A8A878',
     fruitA: '公平鸽果实',
-    fruitB: null,       // 音碟吼果实暂未上线
+    fruitB: '猴麦仔果实',
     spiritA: '公平鸽',
     spiritB: '音碟吼',
     shinies: ['公平鸽', '音碟吼'],
     unlockA: '待游戏更新后补充',
-    unlockB: '完成 S2 第五章赛季任务（2026/6/12 后开放）\n捕捉 1 只奇异血脉的音碟吼\n（注：音碟吼果实暂未上线，果实解锁后可双果混刷）',
+    unlockB: '完成 S2 第五章赛季任务（2026/6/12 后开放）\n捕捉 1 只奇异血脉的音碟吼',
   },
 
   // 4. 毒系：嘟嘟煲
@@ -600,6 +600,26 @@ export const S2_PLANS = [
   },
 
   // ─── S2 属性方案（单果版）+ 新单果方案 ─────────────────────────────────────
+
+  // 噼啪鸟（电系单果）：噼啪鸟果实 → 电系池 → 炫光迪迪（100%）
+  // 注：噼啪鸟为电+翼双属精灵，自身无异色，入池后 100% 检索电系唯一 S2 异色炫光迪迪
+  {
+    id: 's2_attr_electric_pikabird_single',
+    season: 'S2',
+    category: 'attr',
+    type: '电系',
+    icon: '⚡',
+    iconImg: `${base}attrs/electric.png`,
+    color: '#FDD835',
+    fruitA: '噼啪鸟果实',
+    fruitB: null,
+    spiritA: '噼啪鸟',
+    spiritB: null,
+    shinies: ['炫光迪迪'],
+    unlockA: '集齐 80 只洛克里安图鉴，至「圣所前哨东北侧」找 NPC 兑换',
+    unlockB: null,
+    note: '噼啪鸟为电+翼双属精灵，自身无异色，进电系池 100% 检索炫光迪迪；\n与星光狮果实方案等效，果实来源更易获取',
+  },
 
   // 03. 火系混刷（火焰猿果 + 灵狐果）：双果混刷 → 火系池 → 灵狐 / 烟花伯爵
   {

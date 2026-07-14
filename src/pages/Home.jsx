@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store';
 import { PLANS, getPlanAttrId, classifyPool, computeFamilyPool, getPlanMainPool, resolvePlanIconImg, getPlanFruitsArray } from '../data/plans';
-import { S2_PLANS } from '../data/seasons/s2Plans';
+import { S3_PLANS } from '../data/plans';
 import ProgressBar from '../components/ProgressBar';
 import PlanIcon from '../components/PlanIcon';
 import SpiritAvatar from '../components/SpiritAvatar';
@@ -238,6 +238,7 @@ function EmailBindBanner({ navigate }) {
 export default function Home({ navigate }) {
   const { state, poolCounts, authUser } = useStore();
   const hasEmail = !!authUser?.email;
+  const [showDonateModal, setShowDonateModal] = useState(false);
   const currentSeason = state.currentSeason;
 
   // 解析任务有效赛季：
@@ -246,7 +247,7 @@ export default function Home({ navigate }) {
   // （如任务创建时 currentSeason 还是 S1，而方案的 season 此后才被修改为 S2）。
   const resolveTaskSeason = (task) => {
     const plan = PLANS.find(p => p.id === task.planId)
-      || S2_PLANS.find(p => p.id === task.planId)
+      || S3_PLANS.find(p => p.id === task.planId)
       || (state.userPlanConfig || []).find(p => p.id === task.planId);
     // 方案明确声明了赛季 → 以方案为准
     if (plan?.season) return plan.season;
@@ -258,8 +259,9 @@ export default function Home({ navigate }) {
   const tasks = (state.activeTasks || []).filter(t => {
     if (!currentSeason) return true;
     const taskSeason = resolveTaskSeason(t);
-    // 无法确定赛季的旧数据（S1 内置方案也无 season 字段），兜底归 S1 显示
-    return !taskSeason || taskSeason === currentSeason;
+    // 无法确定赛季的任务统一归当前默认赛季 S3（与 computePoolCounts 保持一致）
+    const resolvedSeason = taskSeason || 'S3';
+    return resolvedSeason === currentSeason;
   });
   // 其他赛季还有进行中任务（用于折叠提示）
   const otherSeasonTasks = (state.activeTasks || []).filter(t => {
@@ -281,12 +283,30 @@ export default function Home({ navigate }) {
           alt="小洛克的刷异色助手"
           style={{ height: 42, maxWidth: 'calc(100% - 110px)', objectFit: 'contain', objectPosition: 'left', display: 'block' }}
         />
-        {/* 副标题 */}
+        {/* 副标题 + 赞赏按钮同行 */}
         <div style={{
           padding: '6px 0 10px',
-          fontSize: 12, color: 'var(--text-light)', letterSpacing: 2, fontWeight: 600,
+          display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          用耐心换来独一无二的伙伴
+          <span style={{ fontSize: 12, color: 'var(--text-light)', letterSpacing: 2, fontWeight: 600 }}>
+            用耐心换来独一无二的伙伴
+          </span>
+          <button
+            onClick={() => setShowDonateModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 3,
+              padding: '3px 9px',
+              background: 'rgba(200,131,10,0.10)',
+              border: '1px solid rgba(200,131,10,0.35)',
+              borderRadius: 20,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+              flexShrink: 0,
+            }}
+          >
+            <span style={{ fontSize: 11 }}>☕</span>
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#C8830A' }}>支持一下</span>
+          </button>
         </div>
         {/* 赛季切换器：嵌在 hero 区底部，右侧避开小洛克 */}
         <div style={{ maxWidth: 'calc(100% - 90px)', paddingBottom: 2 }}>
@@ -308,61 +328,119 @@ export default function Home({ navigate }) {
         />
       </div>
 
-      {/* S2 赛季说明横幅：两个入口（全宽，矮条） */}
-      <div style={{
-        margin: '0 16px 12px',
-        display: 'flex',
-        alignItems: 'stretch',
-        borderRadius: 8,
-        overflow: 'hidden',
-        border: '1px solid rgba(232,115,58,0.35)',
-        background: 'rgba(232,115,58,0.10)',
-      }}>
-        <a
-          href="https://www.xiaohongshu.com/explore/6a0f06070000000038037c0a"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            padding: '5px 8px',
-            textDecoration: 'none',
-            color: '#D85D28',
-            fontSize: 11,
-            fontWeight: 700,
-            lineHeight: 1.3,
-          }}
-        >
-          <span style={{ fontSize: 12, flexShrink: 0 }}>🎁</span>
-          <span>s2 惊喜盒子机制</span>
-        </a>
-        {/* 分隔线 */}
-        <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(232,115,58,0.35)', flexShrink: 0 }} />
-        <a
-          href="https://www.xiaohongshu.com/explore/6a05a27f00000000380203bc"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 4,
-            padding: '5px 8px',
-            textDecoration: 'none',
-            color: '#D85D28',
-            fontSize: 11,
-            fontWeight: 700,
-            lineHeight: 1.3,
-          }}
-        >
-          <span style={{ fontSize: 12, flexShrink: 0 }}>🎡</span>
-          <span>三池计数机制</span>
-        </a>
-      </div>
+      {/* 赛季说明横幅：S3 / S2 各显各的链接入口；S1 不显示 */}
+      {currentSeason === 'S3' && (
+        <div style={{
+          margin: '0 16px 12px',
+          display: 'flex',
+          alignItems: 'stretch',
+          borderRadius: 8,
+          overflow: 'hidden',
+          border: '1px solid rgba(123,31,162,0.35)',
+          background: 'rgba(123,31,162,0.08)',
+        }}>
+          <a
+            href="https://www.xiaohongshu.com/explore/6a05a27f00000000380203bc"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '5px 8px',
+              textDecoration: 'none',
+              color: '#7B1FA2',
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 12, flexShrink: 0 }}>📖</span>
+            <span>S3 铅字幻梦攻略</span>
+          </a>
+          {/* 分隔线 */}
+          <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(123,31,162,0.3)', flexShrink: 0 }} />
+          <a
+            href="https://www.xiaohongshu.com/explore/6a05a27f00000000380203bc"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '5px 8px',
+              textDecoration: 'none',
+              color: '#7B1FA2',
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 12, flexShrink: 0 }}>🎡</span>
+            <span>三池计数机制</span>
+          </a>
+        </div>
+      )}
+      {currentSeason === 'S2' && (
+        <div style={{
+          margin: '0 16px 12px',
+          display: 'flex',
+          alignItems: 'stretch',
+          borderRadius: 8,
+          overflow: 'hidden',
+          border: '1px solid rgba(232,115,58,0.35)',
+          background: 'rgba(232,115,58,0.10)',
+        }}>
+          <a
+            href="https://www.xiaohongshu.com/explore/6a0f06070000000038037c0a"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '5px 8px',
+              textDecoration: 'none',
+              color: '#D85D28',
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 12, flexShrink: 0 }}>🎁</span>
+            <span>s2 惊喜盒子机制</span>
+          </a>
+          {/* 分隔线 */}
+          <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(232,115,58,0.35)', flexShrink: 0 }} />
+          <a
+            href="https://www.xiaohongshu.com/explore/6a05a27f00000000380203bc"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              padding: '5px 8px',
+              textDecoration: 'none',
+              color: '#D85D28',
+              fontSize: 11,
+              fontWeight: 700,
+              lineHeight: 1.3,
+            }}
+          >
+            <span style={{ fontSize: 12, flexShrink: 0 }}>🎡</span>
+            <span>三池计数机制</span>
+          </a>
+        </div>
+      )}
 
       {/* 邮箱绑定推荐横幅（未绑定邮箱时展示） */}
       {!hasEmail && (
@@ -462,7 +540,7 @@ export default function Home({ navigate }) {
       {/* 进行中任务卡片 */}
       {tasks.map((task, idx) => {
         const rawPlan = PLANS.find(p => p.id === task.planId)
-          || S2_PLANS.find(p => p.id === task.planId)
+          || S3_PLANS.find(p => p.id === task.planId)
           || (state.userPlanConfig || []).find(p => p.id === task.planId);
         if (!rawPlan) return null;
         // 自定义方案继承基础属性方案的图标
@@ -536,15 +614,18 @@ export default function Home({ navigate }) {
                   {(() => {
                     const ts = resolveTaskSeason(task);
                     if (!ts) return null;
+                    const s3Style = { bg: 'rgba(123,31,162,0.2)', color: '#9C27B0', border: 'rgba(123,31,162,0.45)' };
+                    const s2Style = { bg: 'rgba(232,115,58,0.25)', color: '#E8733A', border: 'rgba(232,115,58,0.5)' };
+                    const s1Style = { bg: 'rgba(139,115,85,0.25)', color: '#C4A882', border: 'rgba(139,115,85,0.45)' };
+                    const st = ts === 'S3' ? s3Style : ts === 'S2' ? s2Style : s1Style;
                     return (
                       <span style={{
                         fontSize: 9, fontWeight: 800, padding: '2px 6px', borderRadius: 10,
-                        background: ts === 'S2' ? 'rgba(232,115,58,0.25)' : 'rgba(139,115,85,0.25)',
-                        color: ts === 'S2' ? '#E8733A' : '#C4A882',
-                        border: `1px solid ${ts === 'S2' ? 'rgba(232,115,58,0.5)' : 'rgba(139,115,85,0.45)'}`,
+                        background: st.bg, color: st.color,
+                        border: `1px solid ${st.border}`,
                         lineHeight: 1.4,
                       }}>
-                        {ts === 'S1' ? '🌙 S1' : '🎪 S2'}
+                        {ts === 'S3' ? '📖 S3' : ts === 'S1' ? '🌙 S1' : '🎪 S2'}
                       </span>
                     );
                   })()}
@@ -703,7 +784,7 @@ export default function Home({ navigate }) {
           {/* 折叠内容 */}
           {otherExpanded && otherSeasonTasks.map((task, idx) => {
             const rawPlan = PLANS.find(p => p.id === task.planId)
-              || S2_PLANS.find(p => p.id === task.planId)
+              || S3_PLANS.find(p => p.id === task.planId)
               || (state.userPlanConfig || []).find(p => p.id === task.planId);
             if (!rawPlan) return null;
             const attrBase = rawPlan.attrId ? PLANS.find(p => p.id === rawPlan.attrId) : null;
@@ -797,6 +878,67 @@ export default function Home({ navigate }) {
         }}>
           在眠枭庇护所放好果实后，开始记录触发污染进度
         </p>
+      )}
+
+      {/* ── 赞赏弹窗 ── */}
+      {showDonateModal && (
+        <div
+          onClick={() => setShowDonateModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 20,
+              padding: '20px 20px 18px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+              maxWidth: 340, width: '92%',
+              position: 'relative',
+            }}
+          >
+            <button
+              onClick={() => setShowDonateModal(false)}
+              style={{
+                position: 'absolute', top: 12, right: 14,
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 18, color: 'var(--text-muted)', lineHeight: 1,
+              }}
+            >✕</button>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)' }}>
+              ☕ 请作者喝杯奶茶
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 500, textAlign: 'center', lineHeight: 1.7 }}>
+              这个工具完全免费，用爱发电维护中<br />
+              如果帮到你了，欢迎请我喝奶茶 ✨
+            </div>
+            {/* 赞赏码图片：上传后将 donate-qrcode.webp 放入 public/ 即可 */}
+            <img
+              src={`${import.meta.env.BASE_URL}donate-qrcode.webp`}
+              alt="赞赏码"
+              style={{ width: '100%', borderRadius: 12, objectFit: 'contain' }}
+              onError={e => {
+                // 图片未上传时显示占位提示
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div style={{
+              display: 'none',
+              width: '100%', height: 180,
+              background: '#F5F0E8', borderRadius: 12,
+              alignItems: 'center', justifyContent: 'center',
+              flexDirection: 'column', gap: 6,
+            }}>
+              <span style={{ fontSize: 28 }}>☕</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>赞赏码图片待上传</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

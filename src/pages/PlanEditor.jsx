@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { PLANS, getShinisByAttr, FRUIT_ATTR, getPlanFruitsArray, getFruitBySpirit, getAllSpiritFruitPairs, getAttrByAnyName } from '../data/plans';
 import { S2_PLANS } from '../data/seasons/s2Plans';
+import { S3_PLANS } from '../data/plans';
 import { getAllEntries, ATTR_CONFIG } from '../data/fruitGuide';
 import { FRUITS_WIKI_IMG } from '../data/fruits-wiki';
 import PlanIcon from '../components/PlanIcon';
@@ -73,13 +74,16 @@ function buildShinyGroups(planList) {
 }
 
 // ── 按赛季分层的异色精灵分组 ────────────────────────────────────────────────
-// 结构：[{ season: 'S1', label: 'S1 经典', groups: [...] }, { season: 'S2', ... }]
+// 结构：[{ season: 'S3', label: 'S3 铅字幻梦', groups: [...] }, ...]
 const ALL_SHINIES_BY_SEASON = (() => {
   // S1：只用 PLANS（内置 9 属系方案）
   const s1Groups = buildShinyGroups(PLANS.filter(p => p.shinies?.length > 0));
   // S2：用 S2_PLANS 里有 shinies 的方案
   const s2Groups = buildShinyGroups(S2_PLANS.filter(p => p.shinies?.length > 0));
+  // S3：用 S3_PLANS 里有 shinies 的方案
+  const s3Groups = buildShinyGroups(S3_PLANS.filter(p => p.shinies?.length > 0));
   return [
+    { season: 'S3', label: 'S3 铅字幻梦', groups: s3Groups },
     { season: 'S2', label: 'S2 狂欢', groups: s2Groups },
     { season: 'S1', label: 'S1 经典', groups: s1Groups },
   ];
@@ -189,7 +193,7 @@ function FruitInput({ value, onChange, placeholder, required }) {
       />
       {open && suggestions.length > 0 && (
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+          position: 'absolute', bottom: 'calc(100% + 4px)', left: 0, right: 0,
           background: '#FBF7EC', border: '1.5px solid var(--card-border)',
           borderRadius: 10, boxShadow: '0 4px 16px rgba(43,42,46,0.14)',
           zIndex: 300, overflow: 'hidden', maxHeight: 260, overflowY: 'auto',
@@ -757,9 +761,9 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
 
   const [attrId,  setAttrId]  = useState(initAttrId);
   const [label,   setLabel]   = useState(initLabel);
-  // 赛季选择：编辑时读已存值，新建时默认当前赛季（兜底 'S2'）
+  // 赛季选择：编辑时读已存值，新建时默认当前赛季（兜底 'S3'）
   const [selectedSeason, setSelectedSeason] = useState(
-    existingUserPlan?.season || state.currentSeason || 'S2'
+    existingUserPlan?.season || state.currentSeason || 'S3'
   );
   // fruits 是数组：[{ fruit, spirit, attrManual }, ...]，最多 6 个
   const [fruits,  setFruits]  = useState(initFruits);
@@ -1033,22 +1037,26 @@ export default function PlanEditor({ basePlanId, userPlanId, goBack }) {
         <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', flexShrink: 0 }}>归属赛季</span>
           <div style={{ display: 'flex', gap: 6 }}>
-            {['S1', 'S2'].map(s => {
-              const active = selectedSeason === s;
+            {[
+              { key: 'S1', activeColor: '#C8830A', activeBg: '#FFF9E0', shadow: '#C8A020' },
+              { key: 'S2', activeColor: '#C8830A', activeBg: '#FFF9E0', shadow: '#C8A020' },
+              { key: 'S3', activeColor: '#7B1FA2', activeBg: 'rgba(123,31,162,0.08)', shadow: '#9C27B0' },
+            ].map(({ key, activeColor, activeBg, shadow }) => {
+              const active = selectedSeason === key;
               return (
                 <button
-                  key={s}
-                  onClick={() => setSelectedSeason(s)}
+                  key={key}
+                  onClick={() => setSelectedSeason(key)}
                   style={{
                     padding: '4px 16px', borderRadius: 8, cursor: 'pointer',
                     fontFamily: 'var(--font-body)', fontSize: 12, fontWeight: 800,
-                    border: active ? '2px solid #C8830A' : '1.5px solid var(--divider)',
-                    background: active ? '#FFF9E0' : 'var(--card-inner)',
-                    color: active ? '#C8830A' : 'var(--text-muted)',
-                    boxShadow: active ? '0 2px 0 #C8A020' : 'none',
+                    border: active ? `2px solid ${activeColor}` : '1.5px solid var(--divider)',
+                    background: active ? activeBg : 'var(--card-inner)',
+                    color: active ? activeColor : 'var(--text-muted)',
+                    boxShadow: active ? `0 2px 0 ${shadow}` : 'none',
                     transition: 'all 0.15s',
                   }}
-                >{s}</button>
+                >{key}</button>
               );
             })}
           </div>

@@ -771,6 +771,15 @@ body.hide-scrollbar::-webkit-scrollbar { display: none; }
   object-fit: cover;
   border-radius: 4px;
 }
+/* 可点击色块（有精灵名时支持改名） */
+.shield-dot.clickable {
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.shield-dot.clickable:active {
+  transform: scale(0.9);
+  box-shadow: 0 0 0 2px rgba(91,156,246,0.5);
+}
 /* 色块内 emoji（jelly / shiny） */
 .shield-dot .dot-emoji {
   font-size: 12px;

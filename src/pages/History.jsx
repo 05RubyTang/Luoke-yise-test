@@ -422,7 +422,9 @@ function HistoryCard({ task, index, userPlanConfig, onDetail }) {
     const ori = parseNonNeg(inputs.original);
     const adv = parseNonNeg(inputs.adv), sea = parseNonNeg(inputs.sea), att = parseNonNeg(inputs.att);
     const hasDetail = adv != null && sea != null && att != null;
-    const bal = hasDetail ? adv + sea + att : parseNonNeg(inputs.ballsUsed);
+    const balRaw = hasDetail ? adv + sea + att : parseNonNeg(inputs.ballsUsed);
+    // 球数未填时保留原值，避免误清空已有数据；明确填了数字才覆盖
+    const bal = balRaw != null ? balRaw : task.ballsUsed;
     const ballsUsedByType = hasDetail ? { adv, sea, att } : undefined;
     dispatch({
       type: 'UPDATE_COMPLETED_STATS',

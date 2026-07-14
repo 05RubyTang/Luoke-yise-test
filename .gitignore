@@ -26,6 +26,27 @@ dist-ssr
 *.sw?
 .vercel
 
-# S3 赛季数据（待上线，本地开发用，不提交 GitHub）
+# S3 赛季数据及图片资源（待上线，本地开发用，不提交 GitHub）
 src/data/seasons/s3Plans.js
 public/s3-icon.png
+public/s3-icon.webp
+
+# S3 精灵图（待上线）
+public/spirits/伊贝粉粉.webp
+public/spirits/十字蝌蚪.webp
+public/spirits/千棘盔.webp
+public/spirits/半朽蜜果灵.webp
+public/spirits/卡拉波斯.webp
+public/spirits/卡波.webp
+public/spirits/地鼠.webp
+public/spirits/斑枭.webp
+public/spirits/流明坎德拉.webp
+public/spirits/深渊蛙.webp
+public/spirits/离心舞者.webp
+public/spirits/稻草守护者.webp
+public/spirits/绅士鸡.webp
+public/spirits/胡桃王子.webp
+public/spirits/花衣蝶.webp
+public/spirits/蝴蝶陶陶.webp
+public/spirits/高脚鹬.webp
+public/spirits/龙鱼.webp

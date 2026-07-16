@@ -239,6 +239,7 @@ export default function Home({ navigate }) {
   const { state, poolCounts, authUser } = useStore();
   const hasEmail = !!authUser?.email;
   const [showDonateModal, setShowDonateModal] = useState(false);
+  const [showMigrationModal, setShowMigrationModal] = useState(false);
   const currentSeason = state.currentSeason;
 
   // 解析任务有效赛季：
@@ -509,6 +510,31 @@ export default function Home({ navigate }) {
           </div>
         </div>
       )}
+
+      {/* S3 内容更新与数据迁移说明横幅 */}
+      <div style={{ margin: '0 16px 10px' }}>
+        <button
+          onClick={() => setShowMigrationModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            width: '100%', padding: '11px 14px',
+            border: '1.5px solid rgba(123,31,162,0.4)',
+            borderRadius: 10,
+            background: 'rgba(123,31,162,0.07)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-body)',
+            boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 15, flexShrink: 0 }}>📢</span>
+            <span style={{ fontSize: 13, fontWeight: 800, color: '#7B1FA2' }}>
+              S3 内容更新与数据迁移说明
+            </span>
+          </div>
+          <span style={{ fontSize: 12, color: '#7B1FA2', fontWeight: 700, flexShrink: 0 }}>查看 →</span>
+        </button>
+      </div>
 
       {/* 进行中任务标题 */}
       {tasks.length > 0 && (
@@ -878,6 +904,66 @@ export default function Home({ navigate }) {
         }}>
           在眠枭庇护所放好果实后，开始记录触发污染进度
         </p>
+      )}
+
+      {/* ── 数据迁移说明弹窗 ── */}
+      {showMigrationModal && (
+        <div
+          onClick={() => setShowMigrationModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 20,
+              padding: '22px 20px 20px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+              maxWidth: 340, width: '92%',
+              position: 'relative',
+            }}
+          >
+            <button
+              onClick={() => setShowMigrationModal(false)}
+              style={{
+                position: 'absolute', top: 12, right: 14,
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 18, color: 'var(--text-muted)', lineHeight: 1,
+              }}
+            >✕</button>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#2B2A2E', fontFamily: 'var(--font-display)', textAlign: 'center' }}>
+              📢 S3 内容更新与数据迁移说明
+            </div>
+            <div style={{
+              fontSize: 13, color: '#3D3530', lineHeight: 1.85, fontWeight: 500,
+              textAlign: 'left', width: '100%',
+              background: 'rgba(123,31,162,0.05)',
+              border: '1px solid rgba(123,31,162,0.18)',
+              borderRadius: 10, padding: '12px 14px',
+            }}>
+              由于网站的免费数据库内存快爆满了，数据将迁到小程序里（开发完毕，备案中）。
+              <br /><br />
+              欢迎进入 QQ 群，备案通过后正式版会在群中通知大家。届时账号数据跟着微信号走，可使用邮箱把 S1、S2 的网站数据迁到微信上。
+              <br /><br />
+              <span style={{ color: '#C8830A', fontWeight: 700 }}>未绑定邮箱的小洛克可以快快绑定邮箱哦～</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>
+              扫码加入 QQ 群 · 第一时间获取通知
+            </div>
+            <img
+              src={`${import.meta.env.BASE_URL}qrcode-feedback.webp`}
+              alt="QQ群二维码"
+              style={{ width: '100%', borderRadius: 12, objectFit: 'contain' }}
+            />
+            <div style={{ fontSize: 11, color: 'var(--text-light)', fontWeight: 500, textAlign: 'center', lineHeight: 1.7 }}>
+              QQ 群号：<span style={{ fontWeight: 700, color: '#2B2A2E' }}>1103295482</span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── 赞赏弹窗 ── */}
